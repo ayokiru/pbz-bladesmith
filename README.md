@@ -22,7 +22,9 @@ Status: early. Window app and command line.
   game, so they can't be set from outside). The first preset turns Outlaw Warblade's teal trails crimson.
 - **Previews.** The window shows the game's own inventory renders of both weapons side by side.
 
-Not yet: more color presets, all display names, animated trail previews (effects only render inside the game).
+Weapon names come from the game's own `en-US/Game.locres` (read once with [repak](https://github.com/trumank/repak)).
+
+Not yet: more color presets, animated trail previews (effects only render inside the game).
 
 ## Requirements
 
