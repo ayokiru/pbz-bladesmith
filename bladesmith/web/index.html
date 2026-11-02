@@ -15,7 +15,7 @@
 <header>
   <div class="brand">BLADESMITH<span>weapon transmog for Phantom Blade Zero</span></div>
   <div class="actions">
-    <label class="pak">Pak name <input id="pak" value="zzz_Bladesmith_P" spellcheck="false"></label>
+    <label class="pak">Pak name <input id="pak" value="zzz_Bladesmith_P" spellcheck="false" title="Letters, digits, _ and -. _P is added if missing."></label>
     <button id="btn-open" class="ghost">Open</button>
     <button id="btn-save" class="ghost">Save</button>
     <button id="btn-build" class="ghost">Build</button>
@@ -29,7 +29,7 @@
       <div class="step-head">
         <h2><b>1</b> Base weapon <small>keeps its stats, perks and moveset</small></h2>
         <div class="filters" id="base-filters"></div>
-        <input class="search" id="base-search" placeholder="Search" spellcheck="false">
+        <input class="search" id="base-search" placeholder="Search weapons" spellcheck="false" aria-label="Search weapons">
       </div>
       <div class="grid" id="base-grid"></div>
     </div>
@@ -43,11 +43,19 @@
   </section>
 
   <aside class="preview" id="preview">
-    <div class="empty" id="preview-empty">Pick a base weapon to start.</div>
+    <div class="empty" id="preview-empty">
+      <h3>Make a weapon look the way you want</h3>
+      <ol>
+        <li><b>Pick a base weapon.</b> It keeps its stats, perks and moveset.</li>
+        <li><b>Pick a look.</b> Its blade, and its scabbard if it has one.</li>
+        <li><b>Change trails or their color</b> if you like, then add it to the recipe.</li>
+        <li><b>Build &amp; install</b> with the game closed.</li>
+      </ol>
+    </div>
     <div id="preview-body" hidden>
       <div class="compare">
         <figure><div class="img" id="pv-base-img"></div><figcaption><small>Now</small><span id="pv-base-name"></span></figcaption></figure>
-        <div class="arrow">&#10140;</div>
+        <div class="arrow" id="pv-arrow" aria-hidden="true"></div>
         <figure><div class="img" id="pv-skin-img"></div><figcaption><small>After</small><span id="pv-skin-name"></span></figcaption></figure>
       </div>
       <div class="notes" id="pv-notes"></div>
@@ -63,9 +71,10 @@
       <div class="opt">
         <label>Trails per attack</label>
         <div class="legend"><i class="pill fade">fade</i> ends cleanly on fade weapons <i class="pill blade">blade</i> built like the hero's trails <i class="pill hero">hero</i> used by a player weapon</div>
+        <input class="search wide" id="trail-filter" placeholder="Filter effects by name" spellcheck="false" aria-label="Filter trail effects by name">
         <div id="trails"></div>
       </div>
-      <button class="primary wide" id="btn-add">Add to recipe</button>
+      <div class="add-bar"><button class="primary wide" id="btn-add">Add to recipe</button></div>
     </div>
   </aside>
 </main>
@@ -75,10 +84,10 @@
     <h3>Recipe <span id="recipe-count">0</span></h3>
     <div id="recipe-list" class="recipe-list"><div class="muted">Nothing yet. Pick a base and a look, then "Add to recipe".</div></div>
   </div>
-  <div class="console"><h3>Log</h3><div id="log"></div></div>
+  <div class="console"><h3>Log</h3><div id="log" role="log" aria-live="polite"></div></div>
 </footer>
 
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite"></div>
 <script src="app.js"></script>
 </body>
 </html>

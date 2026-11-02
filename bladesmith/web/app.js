@@ -5,6 +5,18 @@ const FAMILIES = [["all", "All"], ["one-handed", "One-handed"], ["two-handed", "
 const ORIGINAL = "";
 const S = { data: null, base: null, skin: null, browsing: false, family: "all", query: "", recipe: [] };
 const $ = (id) => document.getElementById(id);
+const ICONS = {
+  undo: '<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>',
+  arrow: '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
+  chevron: '<path d="m9 18 6-6-6-6"/>',
+  x: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+  warn: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+};
+function icon(name) {
+  const span = document.createElement("span");
+  span.innerHTML = `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name]}</svg>`;
+  return span.firstChild;
+}
 const byKey = (k) => S.data.weapons.find((w) => w.key === k);
 
 function el(tag, attrs = {}, ...kids) {
@@ -39,10 +51,10 @@ function picture(w, cls = "") {
   return w && w.img ? el("img", { src: w.img, alt: "", class: cls }) : el("div", { class: "noimg" }, "no picture");
 }
 
-function card(w, selected, onclick, disabled = false) {
+function card(w, selected, onclick) {
   const tags = [el("span", { class: "tag" }, w.kind)];
   if (w.fades) tags.push(el("span", { class: "tag fade", title: "ends its trails with a fade" }, "fade"));
-  return el("div", { class: `card${selected ? " sel" : ""}${disabled ? " disabled" : ""}`, onclick: disabled ? null : onclick, title: w.key },
+  return el("button", { type: "button", class: `card${selected ? " sel" : ""}`, onclick, title: w.key, "aria-pressed": String(!!selected) },
     el("div", { class: "img" }, picture(w)),
     el("div", { class: `name${w.named ? "" : " key"}` }, w.name),
     el("div", { class: "tags" }, tags));
@@ -51,7 +63,8 @@ function card(w, selected, onclick, disabled = false) {
 function renderFilters() {
   const box = $("base-filters");
   box.replaceChildren(...FAMILIES.map(([f, label]) =>
-    el("span", { class: `chip${S.family === f ? " on" : ""}`, onclick: () => { S.family = f; renderFilters(); renderBases(); } }, label)));
+    el("button", { type: "button", class: `chip${S.family === f ? " on" : ""}`, "aria-pressed": String(S.family === f),
+      onclick: () => { S.family = f; renderFilters(); renderBases(); } }, label)));
 }
 
 function matches(w) {
@@ -77,8 +90,8 @@ function renderBases() {
 function renderSkins() {
   const base = byKey(S.base);
   const any = $("any-type").checked;
-  const keep = el("div", { class: `card keep${S.skin === null ? " sel" : ""}`, onclick: () => selectSkin(null) },
-    el("div", { class: "img" }, "↺"), el("div", { class: "name" }, "Keep its own look"), el("div", { class: "tags" }));
+  const keep = el("button", { type: "button", class: `card keep${S.skin === null ? " sel" : ""}`, onclick: () => selectSkin(null), "aria-pressed": String(S.skin === null) },
+    el("div", { class: "img" }, icon("undo")), el("div", { class: "name" }, "Keep its own look"), el("div", { class: "tags" }));
   const skins = S.data.weapons
     .filter((w) => w.key !== base.key && w.skinnable && (any || w.family === base.family))
     .sort((a, b) => (b.named - a.named) || a.name.localeCompare(b.name));
@@ -110,6 +123,7 @@ function renderPreview() {
   $("preview-body").hidden = !base;
   if (!base) return;
   const skin = S.skin ? byKey(S.skin) : null;
+  $("pv-arrow").replaceChildren(icon("arrow"));
   $("pv-base-img").replaceChildren(picture(base));
   $("pv-base-name").textContent = base.name;
   $("pv-skin-img").replaceChildren(picture(skin || base));
@@ -117,9 +131,9 @@ function renderPreview() {
 
   const notes = [];
   if (skin && skin.family !== base.family)
-    notes.push(el("div", { class: "warn" }, `⚠ ${skin.kind} look on a ${base.kind} weapon: hitboxes and animations stay with the base, the blade may not line up.`));
+    notes.push(el("div", { class: "warn" }, icon("warn"), ` ${skin.kind} look on a ${base.kind} weapon: hitboxes and animations stay with the base, the blade may not line up.`));
   if (skin && skin.blades !== base.blades)
-    notes.push(el("div", { class: "warn" }, `⚠ ${base.name} has ${base.blades} blade(s), ${skin.name} has ${skin.blades}. Only matching slots change.`));
+    notes.push(el("div", { class: "warn" }, icon("warn"), ` ${base.name} has ${base.blades} blade(s), ${skin.name} has ${skin.blades}. Only matching slots change.`));
   if (base.fades)
     notes.push(el("div", {}, `${base.name} ends its trails with a fade. Pick effects marked fade, others keep following the blade while you run.`));
   notes.push(el("div", {}, "Stats, perks, moveset and hitboxes always stay with the base weapon."));
@@ -141,6 +155,21 @@ function renderPreview() {
   }));
 }
 
+function updateAddLabel() {
+  const inRecipe = S.base && S.recipe.some((r) => r.base === S.base);
+  $("btn-add").textContent = inRecipe ? "Update recipe" : "Add to recipe";
+}
+
+// Narrow the long effect lists: every select keeps its current value plus the effects whose name matches.
+function filterTrails() {
+  const q = $("trail-filter").value.trim().toLowerCase();
+  for (const sel of document.querySelectorAll("#trails select")) {
+    for (const opt of sel.querySelectorAll("option")) {
+      opt.hidden = !!q && opt.value !== "" && opt.value !== sel.value && !opt.textContent.toLowerCase().includes(q);
+    }
+  }
+}
+
 function selectBase(key) {
   S.base = key;
   S.browsing = false;
@@ -152,6 +181,9 @@ function selectBase(key) {
   renderPreview();
   const existing = S.recipe.find((r) => r.base === key);
   if (existing) loadEntry(existing);
+  $("trail-filter").value = "";
+  updateAddLabel();
+  renderRecipe();
 }
 
 function selectSkin(key) {
@@ -206,19 +238,24 @@ function renderRecipe() {
   }
   $("recipe-list").replaceChildren(...S.recipe.map((e, i) => {
     const b = byKey(e.base) || { name: e.base }, s = e.skin ? byKey(e.skin) || { name: e.skin } : null;
-    return el("div", { class: "rcard", title: "Click to edit", onclick: () => selectBase(e.base) },
-      picture(b), el("span", { class: "a" }, "›"), picture(s || b),
+    return el("div", { class: `rcard${S.base === e.base ? " editing" : ""}`, title: "Click to edit", role: "button", tabindex: "0",
+      "aria-label": `Edit ${b.name}`, onclick: () => selectBase(e.base),
+      onkeydown: (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); selectBase(e.base); } } },
+      picture(b), el("span", { class: "a" }, icon("chevron")), picture(s || b),
       el("div", { class: "txt" }, b.name, el("small", {}, s ? "as " + s.name : "own look"), el("small", {}, describe(e))),
-      el("span", { class: "x", title: "Remove", onclick: (ev) => { ev.stopPropagation(); S.recipe.splice(i, 1); renderRecipe(); } }, "✕"));
+      el("button", { type: "button", class: "x", title: "Remove", "aria-label": `Remove ${b.name} from the recipe`,
+        onclick: (ev) => { ev.stopPropagation(); S.recipe.splice(i, 1); renderRecipe(); updateAddLabel(); } }, icon("x")));
   }));
 }
 
 function addToRecipe() {
   const e = currentEntry();
   if (Object.keys(e).length === 1) return toast("Nothing to change yet: pick a look, a trail or a color.", true);
+  const updating = S.recipe.some((r) => r.base === e.base);
   S.recipe = S.recipe.filter((r) => r.base !== e.base).concat([e]);
   renderRecipe();
-  toast(`${byKey(e.base).name} added to the recipe.`);
+  updateAddLabel();
+  toast(`${byKey(e.base).name} ${updating ? "updated in" : "added to"} the recipe.`);
 }
 
 function recipe() {
@@ -228,13 +265,19 @@ function recipe() {
 async function build(install) {
   if (!S.recipe.length) return toast("The recipe is empty.", true);
   const buttons = ["btn-build", "btn-install"].map($);
+  const pressed = $(install ? "btn-install" : "btn-build");
+  const label = pressed.textContent;
   buttons.forEach((b) => (b.disabled = true));
+  pressed.setAttribute("aria-busy", "true");
+  pressed.textContent = "Building...";
   try {
     const res = await window.pywebview.api.build(recipe(), install);
     if (res.ok) toast(install ? "Built and installed. Start the game!" : "Built: " + res.folder);
     else toast(res.error, true);
   } finally {
     buttons.forEach((b) => (b.disabled = false));
+    pressed.removeAttribute("aria-busy");
+    pressed.textContent = label;
   }
 }
 
@@ -257,6 +300,7 @@ async function boot() {
     $("color-hint").textContent = p ? p.description : "";
   });
   $("btn-add").addEventListener("click", addToRecipe);
+  $("trail-filter").addEventListener("input", filterTrails);
   $("btn-build").addEventListener("click", () => build(false));
   $("btn-install").addEventListener("click", () => build(true));
   $("btn-save").addEventListener("click", () => window.pywebview.api.save_recipe(recipe()));
