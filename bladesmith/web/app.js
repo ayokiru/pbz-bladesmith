@@ -54,6 +54,7 @@ function picture(w, cls = "") {
 function card(w, selected, onclick) {
   const tags = [el("span", { class: "tag" }, w.kind)];
   if (w.fades) tags.push(el("span", { class: "tag fade", title: "ends its trails with a fade" }, "fade"));
+  if (w.tested) tags.push(el("span", { class: "tag tested", title: "checked in the game" }, "tested"));
   return el("button", { type: "button", class: `card${selected ? " sel" : ""}`, onclick, title: w.key, "aria-pressed": String(!!selected) },
     el("div", { class: "img" }, picture(w)),
     el("div", { class: `name${w.named ? "" : " key"}` }, w.name),
@@ -89,6 +90,12 @@ function renderBases() {
 
 function renderSkins() {
   const base = byKey(S.base);
+  $("any-type").closest(".toggle").hidden = !base.skinnable;
+  if (!base.skinnable) {
+    $("skin-grid").replaceChildren(el("div", { class: "locked" },
+      `${base.name} keeps its blade in a different kind of asset, so it can't wear another look yet. Its trails and their colors can still be changed on the right.`));
+    return;
+  }
   const any = $("any-type").checked;
   const keep = el("button", { type: "button", class: `card keep${S.skin === null ? " sel" : ""}`, onclick: () => selectSkin(null), "aria-pressed": String(S.skin === null) },
     el("div", { class: "img" }, icon("undo")), el("div", { class: "name" }, "Keep its own look"), el("div", { class: "tags" }));
@@ -273,12 +280,90 @@ async function build(install) {
   try {
     const res = await window.pywebview.api.build(recipe(), install);
     if (res.ok) toast(install ? "Built and installed. Start the game!" : "Built: " + res.folder);
+    if (res.ok && install) refreshInstalledCount();
     else toast(res.error, true);
   } finally {
     buttons.forEach((b) => (b.disabled = false));
     pressed.removeAttribute("aria-busy");
     pressed.textContent = label;
   }
+}
+
+// ---------- first start ----------
+function showSetup(setup) {
+  document.querySelector("#loading .spinner").hidden = true;
+  $("loading-log").textContent = "";
+  $("setup").hidden = false;
+  $("setup-msg").textContent = setup.message;
+  const retry = el("button", { class: "ghost", onclick: () => location.reload() }, "Try again");
+  const actions = [];
+  if (setup.kind === "game") {
+    actions.push(el("button", { class: "primary", onclick: async () => {
+      const res = await window.pywebview.api.choose_game_folder();
+      if (res.ok) location.reload();
+      else if (res.error) $("setup-msg").textContent = res.error;
+    } }, "Choose the game folder"));
+  } else if (setup.kind === "dotnet") {
+    actions.push(el("button", { class: "primary", onclick: () => window.pywebview.api.open_url(setup.url) }, "Download .NET 8 Desktop Runtime"), retry);
+  } else {
+    actions.push(retry);
+  }
+  $("setup-actions").replaceChildren(...actions);
+}
+
+// ---------- installed paks ----------
+async function refreshInstalledCount() {
+  S.installed = await window.pywebview.api.installed();
+  $("installed-count").textContent = S.installed.length;
+  return S.installed;
+}
+
+async function openDrawer() {
+  S.lastFocus = document.activeElement;
+  $("drawer").hidden = $("drawer-shade").hidden = false;
+  await renderInstalled();
+  $("drawer-close").focus();
+}
+
+function closeDrawer() {
+  $("drawer").hidden = $("drawer-shade").hidden = true;
+  if (S.lastFocus) S.lastFocus.focus();
+}
+
+async function renderInstalled() {
+  const list = await refreshInstalledCount();
+  if (!list.length) {
+    $("installed-list").replaceChildren(el("div", { class: "muted" }, "Nothing installed yet. Build & install a recipe first."));
+    return;
+  }
+  $("installed-list").replaceChildren(...list.map((p) => {
+    const lines = (p.recipe.weapons || []).map((e) => {
+      const b = byKey(e.base), s = e.skin ? byKey(e.skin) : null;
+      return el("li", {}, `${b ? b.name : e.base}${s ? " as " + s.name : ""}${e.trail_color ? " \u00B7 " + e.trail_color : ""}`);
+    });
+    const remove = el("button", { class: "ghost" }, "Remove");
+    remove.addEventListener("click", async () => {
+      if (!remove.classList.contains("danger")) {  // two clicks: no browser dialogs inside the app
+        remove.classList.add("danger");
+        remove.textContent = "Click again to remove";
+        setTimeout(() => { remove.classList.remove("danger"); remove.textContent = "Remove"; }, 4000);
+        return;
+      }
+      const res = await window.pywebview.api.uninstall(p.name);
+      if (res.ok) { toast(`${p.name} removed. The weapons are back to the original look.`); renderInstalled(); }
+      else toast(res.error, true);
+    });
+    const edit = el("button", { class: "ghost", onclick: () => {
+      S.recipe = p.recipe.weapons || [];
+      $("pak").value = p.name;
+      renderRecipe();
+      closeDrawer();
+      toast(`Loaded ${p.name}. Change it and press Build & install to update it.`);
+    } }, "Edit");
+    return el("div", { class: "inst" },
+      el("div", { class: "top" }, el("span", { class: "name" }, p.name), el("span", { class: "date" }, p.date)),
+      el("ul", {}, lines), el("div", { class: "row" }, edit, remove));
+  }));
 }
 
 // ---------- boot ----------
@@ -289,6 +374,7 @@ async function boot() {
     $("loading-log").textContent = "Could not read the game: " + err;
     return;
   }
+  if (S.data.setup) return showSetup(S.data.setup);
   $("loading").remove();
   renderFilters();
   renderBases();
@@ -300,6 +386,12 @@ async function boot() {
     $("color-hint").textContent = p ? p.description : "";
   });
   $("btn-add").addEventListener("click", addToRecipe);
+  $("btn-installed").addEventListener("click", openDrawer);
+  $("drawer-close").replaceChildren(icon("x"));
+  $("drawer-close").addEventListener("click", closeDrawer);
+  $("drawer-shade").addEventListener("click", closeDrawer);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("drawer").hidden) closeDrawer(); });
+  refreshInstalledCount();
   $("trail-filter").addEventListener("input", filterTrails);
   $("btn-build").addEventListener("click", () => build(false));
   $("btn-install").addEventListener("click", () => build(true));

@@ -6,3 +6,4 @@ catalog.json
 tools/
 __pycache__/
 *.pyc
+build/

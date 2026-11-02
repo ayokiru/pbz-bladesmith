@@ -9,6 +9,8 @@ from pathlib import Path
 from .asset import Asset, prop_value
 from .game import Game
 
+# Weapons whose edited versions were checked in the game (as bases or as skins)
+TESTED = {"Iron", "ZhanMaBlade", "SnakeDual", "LuanYing_Evolution", "Tang", "Long", "Double"}
 VARIANT = re.compile(r"Temp_|Prologue|HorseCart|Young_|Evaluation|^MoQie$|^XieHuo$|^ZhuGuangBaoQi$")
 
 

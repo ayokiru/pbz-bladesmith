@@ -10,12 +10,17 @@
   <div class="brand big">BLADESMITH</div>
   <div class="spinner"></div>
   <div id="loading-log"></div>
+  <div id="setup" hidden>
+    <p id="setup-msg"></p>
+    <div class="setup-actions" id="setup-actions"></div>
+  </div>
 </div>
 
 <header>
   <div class="brand">BLADESMITH<span>weapon transmog for Phantom Blade Zero</span></div>
   <div class="actions">
     <label class="pak">Pak name <input id="pak" value="zzz_Bladesmith_P" spellcheck="false" title="Letters, digits, _ and -. _P is added if missing."></label>
+    <button id="btn-installed" class="ghost" aria-haspopup="dialog">Installed <span id="installed-count" class="count">0</span></button>
     <button id="btn-open" class="ghost">Open</button>
     <button id="btn-save" class="ghost">Save</button>
     <button id="btn-build" class="ghost">Build</button>
@@ -87,6 +92,15 @@
   <div class="console"><h3>Log</h3><div id="log" role="log" aria-live="polite"></div></div>
 </footer>
 
+<div id="drawer-shade" hidden></div>
+<aside id="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" hidden>
+  <div class="drawer-head">
+    <h2 id="drawer-title">Installed paks</h2>
+    <button class="ghost icon-btn" id="drawer-close" aria-label="Close"></button>
+  </div>
+  <p class="muted">Paks Bladesmith put into your ~mods folder. Remove one to go back to the original weapons.</p>
+  <div id="installed-list"></div>
+</aside>
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="app.js"></script>
 </body>
