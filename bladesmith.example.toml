@@ -1,0 +1,17 @@
+# Copy to bladesmith.toml and edit.
+
+# Folder that contains ProjectPBZ\ (the game's install folder).
+game_dir = "C:/Program Files (x86)/Steam/steamapps/common/PBZ"
+
+# AES key of the game's IoStore containers (game build 5.7.4-301524).
+aes_key = "0x4BC8A51E5381325073F2BC7D4E3089CD557C4E9B7D453901C2C795518867E01D"
+
+# Helper tools (see README): retoc with multi-partition .ucas support, and UAssetGUI 1.1.0.
+retoc = "tools/retoc.exe"
+uassetgui = "tools/UAssetGUI.exe"
+
+# Name of the .usmap file in %LOCALAPPDATA%\UAssetGUI\Mappings (without extension).
+mappings = "PBZ"
+
+# Extracted assets, JSON and build stage.
+cache_dir = ".cache"

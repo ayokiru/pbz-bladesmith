@@ -1,0 +1,6 @@
+{
+  "pak_name": "zzz_SanguineSkins_WildOriole_P",
+  "weapons": [
+    {"base": "LuanYing_Evolution", "skin": "Tang", "slots": [0], "scabbard": true}
+  ]
+}

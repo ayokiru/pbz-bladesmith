@@ -1,0 +1,85 @@
+--- a/retoc/src/iostore.rs
++++ b/retoc/src/iostore.rs
+@@ -310,7 +310,7 @@
+     #[allow(unused)]
+     path: PathBuf,
+     toc: Toc,
+-    cas: FilePool,
++    cas: Vec<FilePool>,
+ 
+     container_header: Option<FIoContainerHeader>,
+ }
+@@ -318,7 +318,14 @@
+     pub fn open<P: AsRef<Path>>(toc_path: P, config: Arc<Config>) -> Result<Self> {
+         let path = toc_path.as_ref().to_path_buf();
+         let toc: Toc = BufReader::new(fs::File::open(&path)?).de_ctx(config.clone())?;
+-        let cas = FilePool::new(path.with_extension("ucas"), rayon::max_num_threads())?;
++        let mut cas = vec![FilePool::new(path.with_extension("ucas"), rayon::max_num_threads())?];
++        // multi-partition containers: <name>.ucas, <name>_s1.ucas, <name>_s2.ucas, ...
++        if toc.partition_count > 1 {
++            let stem = path.file_stem().context("failed to get container name")?.to_string_lossy().to_string();
++            for i in 1..toc.partition_count {
++                cas.push(FilePool::new(path.with_file_name(format!("{stem}_s{i}.ucas")), rayon::max_num_threads())?);
++            }
++        }
+ 
+         let mut container = Self {
+             name: path.file_stem().context("failed to get container name")?.to_string_lossy().into(),
+@@ -382,8 +389,8 @@
+     fn read(&self, chunk_id: FIoChunkId) -> Result<Vec<u8>> {
+         let chunk_id = chunk_id.with_version(self.toc.version);
+         let index = *self.toc.chunk_id_map.get(&chunk_id).with_context(|| format!("container {:?} does not contain {:?}", self.name, chunk_id))?;
+-        let mut file_lock = self.cas.acquire()?;
+-        self.toc.read(&mut file_lock.file(), index).with_context(|| format!("Failed to read chunk {chunk_id:?}"))
++        let mut reader = PartitionedCas { pools: &self.cas, handles: (0..self.cas.len()).map(|_| None).collect(), partition_size: self.toc.partition_size, cur: 0 };
++        self.toc.read(&mut reader, index).with_context(|| format!("Failed to read chunk {chunk_id:?}"))
+     }
+     fn read_raw(&self, chunk_id_raw: FIoChunkIdRaw) -> Result<Vec<u8>> {
+         self.read(FIoChunkId::from_raw(chunk_id_raw, self.toc.version))
+@@ -491,3 +498,46 @@
+         );
+     }
+ }
++
++/// Read+Seek over a container split into several .ucas partitions.
++/// Global offsets map to partition = offset / partition_size.
++struct PartitionedCas<'a> {
++    pools: &'a [FilePool],
++    handles: Vec<Option<crate::file_pool::PooledFileHandle>>,
++    partition_size: u64,
++    cur: usize,
++}
++impl PartitionedCas<'_> {
++    fn handle(&mut self, i: usize) -> std::io::Result<&mut fs::File> {
++        if i >= self.pools.len() {
++            return Err(std::io::Error::other(format!("partition {i} out of range")));
++        }
++        if self.handles[i].is_none() {
++            self.handles[i] = Some(self.pools[i].acquire()?);
++        }
++        Ok(self.handles[i].as_mut().unwrap().file())
++    }
++}
++impl std::io::Read for PartitionedCas<'_> {
++    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
++        let c = self.cur;
++        self.handle(c)?.read(buf)
++    }
++}
++impl std::io::Seek for PartitionedCas<'_> {
++    fn seek(&mut self, pos: std::io::SeekFrom) -> std::io::Result<u64> {
++        match pos {
++            std::io::SeekFrom::Start(off) => {
++                let (part, local) = if self.pools.len() > 1 && self.partition_size > 0 { ((off / self.partition_size) as usize, off % self.partition_size) } else { (0, off) };
++                self.cur = part;
++                self.handle(part)?.seek(std::io::SeekFrom::Start(local))?;
++                Ok(off)
++            }
++            other => {
++                let c = self.cur;
++                let local = self.handle(c)?.seek(other)?;
++                Ok(c as u64 * self.partition_size + local)
++            }
++        }
++    }
++}

@@ -1,0 +1,12 @@
+[project]
+name = "bladesmith"
+version = "0.1.0"
+description = "Weapon transmog builder for Phantom Blade Zero"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+
+[project.scripts]
+bladesmith = "bladesmith.__main__:main"
+
+[tool.setuptools]
+packages = ["bladesmith"]

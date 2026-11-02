@@ -1,0 +1,8 @@
+# local settings and everything extracted from or built for the game
+bladesmith.toml
+.cache/
+out/
+catalog.json
+tools/
+__pycache__/
+*.pyc
