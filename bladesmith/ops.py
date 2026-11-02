@@ -51,7 +51,7 @@ def set_trails(data_asset: Asset, mapping: dict[str, str], base: Weapon, game: G
             continue
         used.add(pat)
         target = mapping[pat]
-        pkg = target if target.startswith("/") and not game.has(target) else game.resolve(target)
+        pkg = game.resolve(target)  # a typo here would ship a pak that points at nothing
         idx = data_asset.add_object_import(pkg, pkg.rsplit("/", 1)[1], "NiagaraSystem", "/Script/Niagara")
         part = next(x for x in val["Value"] if x["Name"].startswith("Particle_"))
         part["Value"] = idx

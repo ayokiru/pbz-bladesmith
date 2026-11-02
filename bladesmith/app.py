@@ -83,13 +83,10 @@ class Api:
 
     def build(self, r: dict, install: bool) -> dict:
         with self._lock:
-            if not r.get("weapons"):
-                return {"ok": False, "error": "The recipe is empty."}
-            name = (r.get("pak_name") or "zzz_Bladesmith_P").strip()
-            r["pak_name"] = name if name.endswith("_P") else name + "_P"   # the engine mounts *_P paks last
             try:
-                out = self._cfg.cache_dir.parent / "out" / r["pak_name"]
-                self._log(f"Building {r['pak_name']}...")
+                name = recipe.pak_name(r)
+                out = self._cfg.cache_dir.parent / "out" / name
+                self._log(f"Building {name}...")
                 utoc, log = recipe.run(self._game, r, self._cfg.cache_dir / "stage", out, allow_mismatch=True)
                 for line in log:
                     self._log(line)

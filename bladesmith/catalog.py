@@ -88,6 +88,7 @@ def load_weapon(game: Game, key: str, with_fade: bool = True) -> Weapon:
         n = vv.get("Particle")
         sysp = a.package_of(n) if isinstance(n, int) and n < 0 else None
         w.trails.append(Trail(tag.removeprefix("Weapon.Trail."), vv.get("WeaponIndex") or 0, vv.get("Slot") or "", sysp))
+    game.ensure([s.bp for s in w.slots if game.has(s.bp)])
     for s in w.slots:
         if game.has(s.bp):
             s.mesh = blade_mesh(game, s.bp)
@@ -107,8 +108,6 @@ def build(game: Game, include_variants: bool = False) -> list[Weapon]:
     for k in keys:
         if VARIANT.search(k) and not include_variants:
             continue
-        w = load_weapon(game, k, with_fade=False)
-        game.ensure([s.bp for s in w.slots if game.has(s.bp)])
         out.append(load_weapon(game, k))
     return out
 

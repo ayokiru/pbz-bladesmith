@@ -46,6 +46,7 @@ def decode_texture(uasset: Path) -> Image.Image:
         data = blob[:int(w * h * BYTES_PER_PIXEL[pf])]
     else:
         size = int(w * h * BYTES_PER_PIXEL[pf])
+        # shortcut: fixed 24-byte tail, checked on PBZ's 2048px DXT5 renders; parse FTexturePlatformData if others look wrong
         start = len(ue) - size - 24
         data = ue[start:start + size]
     return _dds(w, h, pf, data).convert("RGBA")
