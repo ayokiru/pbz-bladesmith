@@ -87,3 +87,22 @@ def repoint_attached_effect(bp: Asset, old_pkg: str, new_pkg: str) -> None:
     if len(hits) != 1:
         raise RecipeError(f"blueprint does not use {old_pkg}")
     bp.repoint_import(hits[0], new_pkg, new_pkg.rsplit("/", 1)[1])
+
+
+def retarget_trails(data_asset: Asset, remap: dict[str, str], canon) -> list[str]:
+    """Point every trail that uses a system in `remap` (original package -> copy package) at the copy."""
+    report = []
+    tr = prop(data_asset.main_data(), "Trails")["Value"]
+    for key, val in tr:
+        part = next(x for x in val["Value"] if x["Name"].startswith("Particle_"))
+        idx = part.get("Value")
+        if not (isinstance(idx, int) and idx < 0):
+            continue
+        src = canon(data_asset.package_of(idx))
+        if src in remap:
+            dst = remap[src]
+            part["Value"] = data_asset.add_object_import(dst, dst.rsplit("/", 1)[1], "NiagaraSystem", "/Script/Niagara")
+            report.append(f"{key['Value'][0]['Value'].removeprefix('Weapon.Trail.')} -> {dst}")
+    if not report:
+        raise RecipeError("trail_color: none of this weapon's trails is covered by the preset")
+    return report

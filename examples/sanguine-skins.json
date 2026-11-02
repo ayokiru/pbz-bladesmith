@@ -6,7 +6,7 @@
      "trails": {"Normal.A": "NS_JinYe_BloodTrail_101",
                 "Normal.B": "NS_ChiYingGuRen_BladeTrail_002",
                 "Normal.C": "NS_BaiShan_BladeTrail_Red_102"}},
-    {"base": "ZhanMaBlade", "skin": "Long", "scabbard": true},
+    {"base": "ZhanMaBlade", "skin": "Long", "scabbard": true, "trail_color": "outlaw-crimson"},
     {"base": "SnakeDual", "skin": "Double", "scabbard": true,
      "trails": {"Normal.A.*": "NS_JinYe_BloodTrail_101",
                 "Normal.B.*": "NS_ChiYingGuRen_BladeTrail_002",

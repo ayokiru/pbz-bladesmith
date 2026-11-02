@@ -6,7 +6,7 @@ look on it (blade model, scabbard, attack trails), and Bladesmith builds a pak m
 It reads the assets from your own game install and writes only the few files it changes, so no game files ship with
 it, and after a game patch you rebuild the pak from the updated game.
 
-Status: early, command line only. A simple window app is planned.
+Status: early. Window app and command line.
 
 ## What it can do
 
@@ -18,12 +18,15 @@ Status: early, command line only. A simple window app is planned.
 - **Checks.** Skins are limited to the same weapon type (one-handed, two-handed, dual), because hitboxes and
   animations stay with the base weapon. Weapons that end their trails with a fade (Outlaw Warblade and eight others)
   get a warning when a trail without fade support is picked, since such a trail keeps following the blade.
+- **Trail colors.** Color presets write the colors into copies of the effects (Niagara color parameters crash this
+  game, so they can't be set from outside). The first preset turns Outlaw Warblade's teal trails crimson.
+- **Previews.** The window shows the game's own inventory renders of both weapons side by side.
 
-Not yet: recoloring effects, display names, previews.
+Not yet: more color presets, all display names, animated trail previews (effects only render inside the game).
 
 ## Requirements
 
-- Windows, Python 3.11+
+- Windows 10/11, Python 3.11+, `pip install pywebview pillow`
 - [retoc](https://github.com/trumank/retoc) built with [`patches/retoc-partitioned-ucas.patch`](patches/retoc-partitioned-ucas.patch).
   The game splits its container into `ProjectPBZ-Windows_s1..s49.ucas`; upstream retoc only opens the first file.
 - [UAssetGUI](https://github.com/atenfyr/UAssetGUI) 1.1.0
@@ -41,9 +44,12 @@ Edit `game_dir` and the tool paths in `bladesmith.toml`.
 ## Usage
 
 ```
+python -m bladesmith gui                     # the window
 python -m bladesmith catalog                 # list player weapons, write catalog.json
 python -m bladesmith build examples/wild-oriole.json --install
 ```
+
+The first start extracts the weapon assets and indexes about 300 trail effects; that takes a few minutes once.
 
 `--install` copies the pak into `~mods`. Close the game first, it locks mod files.
 
@@ -57,6 +63,7 @@ python -m bladesmith build examples/wild-oriole.json --install
     {"base": "Iron", "skin": "Tang", "scabbard": true,
      "trails": {"Normal.A": "NS_JinYe_BloodTrail_101"}},
     {"base": "LuanYing_Evolution", "skin": "Tang", "slots": [0], "scabbard": true},
+    {"base": "ZhanMaBlade", "skin": "Long", "scabbard": true, "trail_color": "outlaw-crimson"},
     {"base": "SnakeDual", "skin": "Double", "scabbard": true,
      "effect_meshes": [{"slot": 1, "system": "NS_SnakeDual_PhantomSword_001", "mesh": "SM_FX_DoubleBlade_101"}]}
   ]
@@ -66,10 +73,11 @@ python -m bladesmith build examples/wild-oriole.json --install
 - `base`, `skin`: weapon keys from `catalog.json` (the part after `Weapon_Hun_`).
 - `slots`: which blades of the base to reskin (default: all).
 - `trails`: tag pattern -> effect name or package path. Tags are the part after `Weapon.Trail.`.
+- `trail_color`: a preset from `bladesmith/presets` for the weapon's own trail effects.
 - Each pak needs its own `pak_name`. Two paks that edit the same weapon conflict; separate weapons stack fine.
 
-The examples rebuild [Sanguine Skins](https://www.nexusmods.com/phantombladezero/mods/399) asset for asset
-(except Outlaw Warblade's recolored trails).
+The examples rebuild [Sanguine Skins](https://www.nexusmods.com/phantombladezero/mods/399) asset for asset,
+including Outlaw Warblade's recolored trails (`python dev/parity.py` compares a build with a reference folder).
 
 ## Credits
 

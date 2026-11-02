@@ -1,8 +1,10 @@
 """What the game offers: player weapons, their slots, meshes, scabbards and trails."""
 from __future__ import annotations
 
+import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
 
 from .asset import Asset, prop_value
 from .game import Game
@@ -109,3 +111,64 @@ def build(game: Game, include_variants: bool = False) -> list[Weapon]:
         game.ensure([s.bp for s in w.slots if game.has(s.bp)])
         out.append(load_weapon(game, k))
     return out
+
+
+def save(weapons: list[Weapon], path: Path) -> None:
+    data = [dict(asdict(w), kind=w.kind, fades=w.fades, variant=w.variant) for w in weapons]
+    Path(path).write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+def load(path: Path) -> list[Weapon]:
+    out = []
+    for d in json.loads(Path(path).read_text(encoding="utf-8")):
+        w = Weapon(d["key"], d["package"])
+        w.slots = [Slot(**s) for s in d["slots"]]
+        w.trails = [Trail(**t) for t in d["trails"]]
+        out.append(w)
+    return out
+
+
+def cached(game: Game) -> list[Weapon]:
+    """Catalog from the cache, built on first use."""
+    p = game.cfg.cache_dir / "catalog.json"
+    if p.exists():
+        return load(p)
+    ws = build(game)
+    save(ws, p)
+    return ws
+
+
+TRAIL_NAME = re.compile(r"trail", re.I)
+NOT_A_BLADE_TRAIL = re.compile(r"kick|foot|smoke|dust|_hand_|seq|notrail|absorb", re.I)
+
+
+def trail_library(game: Game, weapons: list[Weapon]) -> dict[str, dict]:
+    """Effects usable as attack trails: every system on player weapons plus every '*Trail*' system in the game.
+    -> package -> {"fade": exposes UE_StartFade, "blade": built on NE_Template_BladeTrail (the template of the
+    hero's own trails; streamer-style effects tend to leave a shape hanging on the blade tip), "player": bool}.
+    Cached in cache_dir/trails.json."""
+    p = game.cfg.cache_dir / "trails.json"
+    if p.exists():
+        return json.loads(p.read_text(encoding="utf-8"))
+    player = {game.canon(t.system) for w in weapons for t in w.trails
+              if game.has(t.system) and not t.tag.startswith("Kick")}
+    others = {m for m in game.files if m.rsplit("/", 1)[1].startswith("NS_")
+              and TRAIL_NAME.search(m.rsplit("/", 1)[1]) and not NOT_A_BLADE_TRAIL.search(m.rsplit("/", 1)[1])}
+    pkgs = sorted(player | others, key=lambda m: m.rsplit("/", 1)[1].lower())
+    game.ensure(pkgs)
+    lib = {}
+    for m in pkgs:
+        try:
+            raw = game.raw_bytes(m)
+        except Exception:
+            continue
+        lib[m] = {"fade": b"UE_StartFade" in raw, "blade": b"NE_Template_BladeTrail" in raw, "player": m in player}
+    p.write_text(json.dumps(lib, indent=1), encoding="utf-8")
+    return lib
+
+
+NAMES_FILE = Path(__file__).with_name("data") / "names.json"
+
+
+def display_names() -> dict[str, str]:
+    return json.loads(NAMES_FILE.read_text(encoding="utf-8")) if NAMES_FILE.exists() else {}

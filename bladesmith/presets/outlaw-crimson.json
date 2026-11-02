@@ -1,0 +1,48 @@
+{
+  "id": "outlaw-crimson",
+  "description": "Outlaw Warblade's own trails, teal green -> crimson. Keeps their UE_StartFade, so nothing lingers while running.",
+  "systems": {
+    "NS_Weapon_ZhanMaDao_Blade_B_001": {
+      "lut_from": "NS_Weapon_ZhanMaDao_Blade_C_001",
+      "literals": [
+        {"emitter": "BladeTrail002_1", "start": 3, "values": [0.2396, 0.0150, 0.0200]},
+        {"emitter": "BladeTrail_1", "start": 3, "values": [0.7968, 0.0400]},
+        {"emitter": "NE_Template_BladeTrail006_3", "start": 5, "values": [0.7373, 0.0400]}
+      ]
+    },
+    "NS_Weapon_ZhanMaDao_Blade_C_001": {
+      "literals": [
+        {"emitter": "BladeTrail_1", "start": 3, "values": [0.6200, 0.0400]},
+        {"emitter": "Trali_4", "start": 6, "values": [0.3886, 0.0300]},
+        {"emitter": "NE_Template_BladeTrail006_3", "start": 5, "values": [0.3500, 0.0300]}
+      ]
+    }
+  },
+  "materials": {
+    "MI_FX_BS1_Bandit_BladeTrail_102_B": {
+      "Main_Color_0": [0.18, 0.004, 0.008, 0.0],
+      "Main_Color_1": [0.62, 0.015, 0.03, 1.0],
+      "Main_Color_2": [0.50, 0.02, 0.035, 1.0]
+    },
+    "MI_FX_BS1_Bandit_BladeTrail_103_B": {
+      "Color_R": [0.10, 0.003, 0.006, 1.0],
+      "Color_G": [0.10, 0.003, 0.006, 1.0],
+      "Main_Color_1": [0.50, 0.02, 0.03, 0.5],
+      "Main_Color_2": [1.0, 0.10, 0.10, 1.0],
+      "Detail_Weight": [2.0, 0.25, 0.2, 0.0],
+      "ColorTurbulenceWeight": [1.0, 0.3, 0.3, 1.0]
+    },
+    "MI_FX_BS1_Blade_103_B": {
+      "Main_Color_1": [0.33, 0.012, 0.02, 0.5],
+      "Main_Color_2": [1.0, 0.12, 0.12, 0.675]
+    },
+    "MI_FX_BS1_Blade_102_B": {
+      "Main_Color_1": [0.75, 0.04, 0.05, 0.5],
+      "Main_Color_2": [1.0, 0.14, 0.14, 1.0]
+    },
+    "MI_FX_BS1_Blade_001_B": {
+      "Main_Color_1": [0.50, 0.025, 0.035, 0.5],
+      "Main_Color_2": [1.0, 0.14, 0.14, 1.0]
+    }
+  }
+}

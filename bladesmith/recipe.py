@@ -8,6 +8,7 @@ Recipe (JSON):
     {"base": "Iron", "skin": "Tang", "scabbard": true,
      "trails": {"Normal.A": "NS_JinYe_BloodTrail_101"}},
     {"base": "LuanYing_Evolution", "skin": "Tang", "slots": [0], "scabbard": true},
+    {"base": "ZhanMaBlade", "skin": "Long", "scabbard": true, "trail_color": "outlaw-crimson"},
     {"base": "SnakeDual", "skin": "Double", "scabbard": true,
      "effect_meshes": [{"slot": 1, "system": "NS_SnakeDual_PhantomSword_001", "mesh": "SM_FX_DoubleBlade_101"}]}
   ]
@@ -19,7 +20,7 @@ import json
 import shutil
 from pathlib import Path
 
-from . import ops, tools
+from . import ops, recolor, tools
 from .asset import Asset
 from .catalog import load_weapon
 from .game import Game
@@ -36,7 +37,9 @@ class Builder:
         self.game, self.r, self.stage = game, recipe, stage
         self.allow_mismatch = allow_mismatch
         self.edited: dict[str, tuple[Asset, bool]] = {}   # package -> (asset, mapped)
+        self.patches: dict[str, list[recolor.BytePatch]] = {}
         self.log: list[str] = []
+        self.fx_folder = recipe.get("fx_folder", "/PBZVFXPack/VFX/Bladesmith").rstrip("/")
 
     def _asset(self, package: str, mapped: bool = True) -> Asset:
         if package not in self.edited:
@@ -73,13 +76,23 @@ class Builder:
         if w.get("trails"):
             for line in ops.set_trails(self._asset(base.package), w["trails"], base, g):
                 self.log.append("  " + line)
+        if w.get("trail_color"):
+            preset = recolor.load_preset(w["trail_color"])
+            remap, effects, materials = recolor.plan(g, preset, self.fx_folder)
+            for line in ops.retarget_trails(self._asset(base.package), remap, g.canon):
+                self.log.append(f"  {line} ({preset['id']})")
+            for e in effects:
+                self.edited[e.target] = (e.asset, False)
+                self.patches[e.target] = e.patches
+            for pkg, a in materials.items():
+                self.edited[pkg] = (a, True)
         for em in w.get("effect_meshes", []):
             bp = base.slots[em["slot"]].bp
             old = g.resolve(em["system"])
             mesh_to = g.resolve(em["mesh"])
             raw = g.json_of(old, mapped=False)
             src_mesh = next(Asset(raw).package_of(i) for i in Asset(raw).find_imports("StaticMesh"))
-            new = self.r.get("fx_folder", "/PBZVFXPack/VFX/Bladesmith").rstrip("/") + "/" + old.rsplit("/", 1)[1]
+            new = self.fx_folder + "/" + old.rsplit("/", 1)[1]
             copy = ops.copy_effect_with_mesh(raw, old, new, src_mesh, mesh_to)
             self.edited[new] = (copy, False)
             ops.repoint_attached_effect(self._asset(bp), old, new)
@@ -106,6 +119,8 @@ class Builder:
             js.write_text(a.dump(), encoding="utf-8")
             dst = self.stage_path(pkg)
             tools.from_json(self.game.cfg, js, dst, mapped)
+            if pkg in self.patches:
+                recolor.apply_patches(dst.with_suffix(".uexp"), self.patches[pkg])
             out.append(dst)
         return out
 

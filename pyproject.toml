@@ -4,9 +4,13 @@ version = "0.1.0"
 description = "Weapon transmog builder for Phantom Blade Zero"
 requires-python = ">=3.11"
 license = {text = "MIT"}
+dependencies = ["pywebview>=5", "pillow>=10"]
 
 [project.scripts]
 bladesmith = "bladesmith.__main__:main"
 
 [tool.setuptools]
 packages = ["bladesmith"]
+
+[tool.setuptools.package-data]
+bladesmith = ["presets/*.json", "data/*.json", "web/*"]

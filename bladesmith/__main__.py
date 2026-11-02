@@ -2,23 +2,23 @@
 from __future__ import annotations
 
 import argparse
-import json
 import shutil
 import sys
-from dataclasses import asdict
 from pathlib import Path
 
 from . import catalog, config, recipe
 from .game import Game
 from .ops import RecipeError
+from .recolor import PresetError
 from .tools import ToolError
 
 
 def cmd_catalog(cfg, args) -> None:
     g = Game(cfg)
     ws = catalog.build(g, include_variants=args.all)
-    data = [dict(asdict(w), kind=w.kind, fades=w.fades, variant=w.variant) for w in ws]
-    Path(args.out).write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+    catalog.save(ws, Path(args.out))
+    if not args.all:
+        catalog.save(ws, cfg.cache_dir / "catalog.json")
     for w in ws:
         meshes = ", ".join((s.mesh or "?").rsplit("/", 1)[-1] for s in w.slots)
         print(f"{w.key:24s} {w.kind:19s} fade={'Y' if w.fades else '-'}  {meshes}")
@@ -50,11 +50,17 @@ def main(argv=None) -> int:
     b.add_argument("-o", "--out", default="out")
     b.add_argument("--install", action="store_true", help="copy the pak into the game's ~mods folder")
     b.add_argument("--allow-mismatch", action="store_true", help="allow a skin from another weapon type")
+    w = sub.add_parser("gui", help="open the Bladesmith window")
+    w.add_argument("--debug", action="store_true", help="enable the web inspector")
     args = ap.parse_args(argv)
     cfg = config.load(args.config)
+    if args.cmd == "gui":
+        from . import app
+        app.run(cfg, debug=args.debug)
+        return 0
     try:
         {"catalog": cmd_catalog, "build": cmd_build}[args.cmd](cfg, args)
-    except (RecipeError, ToolError, KeyError) as e:
+    except (RecipeError, PresetError, ToolError, KeyError) as e:
         print(f"error: {e.args[0] if e.args else e}", file=sys.stderr)
         return 1
     return 0

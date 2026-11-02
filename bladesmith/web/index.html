@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Bladesmith</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="loading">
+  <div class="brand big">BLADESMITH</div>
+  <div class="spinner"></div>
+  <div id="loading-log"></div>
+</div>
+
+<header>
+  <div class="brand">BLADESMITH<span>weapon transmog for Phantom Blade Zero</span></div>
+  <div class="actions">
+    <label class="pak">Pak name <input id="pak" value="zzz_Bladesmith_P" spellcheck="false"></label>
+    <button id="btn-open" class="ghost">Open</button>
+    <button id="btn-save" class="ghost">Save</button>
+    <button id="btn-build" class="ghost">Build</button>
+    <button id="btn-install" class="primary">Build &amp; install</button>
+  </div>
+</header>
+
+<main>
+  <section class="picker">
+    <div class="step">
+      <div class="step-head">
+        <h2><b>1</b> Base weapon <small>keeps its stats, perks and moveset</small></h2>
+        <div class="filters" id="base-filters"></div>
+        <input class="search" id="base-search" placeholder="Search" spellcheck="false">
+      </div>
+      <div class="grid" id="base-grid"></div>
+    </div>
+    <div class="step" id="skin-step">
+      <div class="step-head">
+        <h2><b>2</b> Look <small>whose blade it wears</small></h2>
+        <label class="toggle"><input type="checkbox" id="any-type"><span></span>other weapon types (experimental)</label>
+      </div>
+      <div class="grid" id="skin-grid"></div>
+    </div>
+  </section>
+
+  <aside class="preview" id="preview">
+    <div class="empty" id="preview-empty">Pick a base weapon to start.</div>
+    <div id="preview-body" hidden>
+      <div class="compare">
+        <figure><div class="img" id="pv-base-img"></div><figcaption><small>Now</small><span id="pv-base-name"></span></figcaption></figure>
+        <div class="arrow">&#10140;</div>
+        <figure><div class="img" id="pv-skin-img"></div><figcaption><small>After</small><span id="pv-skin-name"></span></figcaption></figure>
+      </div>
+      <div class="notes" id="pv-notes"></div>
+
+      <div class="opt">
+        <label class="toggle"><input type="checkbox" id="scabbard" checked><span></span>Use the skin's scabbard</label>
+      </div>
+      <div class="opt" id="color-opt">
+        <label>Trail color</label>
+        <select id="color"></select>
+        <div class="hint" id="color-hint"></div>
+      </div>
+      <div class="opt">
+        <label>Trails per attack</label>
+        <div class="legend"><i class="pill fade">fade</i> ends cleanly on fade weapons <i class="pill blade">blade</i> built like the hero's trails <i class="pill hero">hero</i> used by a player weapon</div>
+        <div id="trails"></div>
+      </div>
+      <button class="primary wide" id="btn-add">Add to recipe</button>
+    </div>
+  </aside>
+</main>
+
+<footer>
+  <div class="recipe">
+    <h3>Recipe <span id="recipe-count">0</span></h3>
+    <div id="recipe-list" class="recipe-list"><div class="muted">Nothing yet. Pick a base and a look, then "Add to recipe".</div></div>
+  </div>
+  <div class="console"><h3>Log</h3><div id="log"></div></div>
+</footer>
+
+<div id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>
