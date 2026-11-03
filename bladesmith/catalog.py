@@ -10,7 +10,7 @@ from .asset import Asset, prop_value
 from .game import Game
 
 # Weapons whose edited versions were checked in the game (as bases or as skins)
-TESTED = {"Iron", "ZhanMaBlade", "SnakeDual", "LuanYing_Evolution", "Tang", "Long", "Double"}
+TESTED = {"BaiShanFengLeiJian", "BaiYing", "ChiRen", "ChiZheCanJian", "CiGuHunDunJian", "Double", "DualHook", "GuiTouBlade", "HeiMoShang", "Horizontal", "Iron", "JadeDual", "Jigsaw", "JueYing", "Long", "LuanYing_Evolution", "PoJun", "SlitheringSword", "SnakeDual", "Tang", "TianXuanQingTongJian", "WoodenSword", "YanYueDao", "YuuBlade", "ZhanMaBlade", "ZiMingJian"}  # checked in the game
 VARIANT = re.compile(r"Temp_|Prologue|HorseCart|Young_|Evaluation|^MoQie$|^XieHuo$|^ZhuGuangBaoQi$")
 
 

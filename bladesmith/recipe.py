@@ -80,7 +80,11 @@ class Builder:
             if w.get("scabbard"):
                 for i in slots:
                     s = skin.slots[min(i, len(skin.slots) - 1)]
-                    if s.scabbard:
+                    if not s.scabbard:
+                        continue
+                    if base.slots[i].scabbard_socket != s.scabbard_socket:  # moving the scabbard crashes the game on equip
+                        self.log.append(f"  slot {i}: {s.scabbard.rsplit('/', 1)[1]} doesn't fit {base.key}, skipped")
+                    else:
                         ops.set_scabbard(self._asset(base.package), i, s.scabbard, s.scabbard_socket)
                         self.log.append(f"  slot {i}: scabbard {s.scabbard.rsplit('/', 1)[1]}")
         if w.get("trails"):

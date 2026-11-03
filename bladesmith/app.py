@@ -88,6 +88,7 @@ class Api:
                     "blades": len(w.slots),
                     "skinnable": bool(w.slots) and all(s.mesh for s in w.slots),
                     "scabbard": any(s.scabbard for s in w.slots),
+                    "scab_sockets": [s.scabbard_socket for s in w.slots],
                     "tested": w.key in catalog.TESTED,
                     "img": self._data_url(imgs[w.key]) if w.key in imgs else None,
                     "trails": [{"tag": t.tag, "system": t.system, "name": short(t.system)}

@@ -18,6 +18,9 @@ function icon(name) {
   return span.firstChild;
 }
 const byKey = (k) => S.data.weapons.find((w) => w.key === k);
+// the builder only keeps a scabbard that sits where the base weapon already has one (moving it crashes the game)
+const scabFits = (base, skin) => skin.scabbard && base.scab_sockets.slice(0, Math.min(base.blades, skin.blades))
+  .some((s, i) => s && s === skin.scab_sockets[Math.min(i, skin.blades - 1)]);
 
 function el(tag, attrs = {}, ...kids) {
   const e = document.createElement(tag);
@@ -129,7 +132,7 @@ function renderPreview() {
   $("pv-notes").replaceChildren(...notes);
 
   const scab = $("scabbard");
-  const hasScab = !!(skin && skin.scabbard);
+  const hasScab = !!(skin && scabFits(base, skin));
   scab.closest(".toggle").classList.toggle("off", !hasScab);
   if (!hasScab) scab.checked = false;
 
@@ -287,7 +290,7 @@ function currentEntry() {
     const skin = byKey(S.skin);
     e.skin = skin.key;
     if (skin.blades !== base.blades) e.slots = [...Array(Math.min(skin.blades, base.blades)).keys()];
-    if ($("scabbard").checked && skin.scabbard) e.scabbard = true;
+    if ($("scabbard").checked && scabFits(base, skin)) e.scabbard = true;
   }
   if (Object.keys(S.trailChoice).length) e.trails = { ...S.trailChoice };
   const [kind, id] = $("color").value.split(":");
