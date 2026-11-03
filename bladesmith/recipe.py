@@ -9,6 +9,7 @@ Recipe (JSON):
      "trails": {"Normal.A": "NS_JinYe_BloodTrail_101"}},
     {"base": "LuanYing_Evolution", "skin": "Tang", "slots": [0], "scabbard": true},
     {"base": "ZhanMaBlade", "skin": "Long", "scabbard": true, "trail_color": "outlaw-crimson"},
+    {"base": "Horizontal", "skin": "Tang", "blade_color": {"to": "#7a7a7a"}},  # optional "from": hue to replace
     {"base": "SnakeDual", "skin": "Double", "scabbard": true,
      "effect_meshes": [{"slot": 1, "system": "NS_SnakeDual_PhantomSword_001", "mesh": "SM_FX_DoubleBlade_101"}]}
   ]
@@ -16,12 +17,13 @@ Recipe (JSON):
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import shutil
 from pathlib import Path
 
-from . import ops, recolor, tools
+from . import ops, recolor, texrecolor, tools
 from .asset import Asset, prop
 from .catalog import load_weapon
 from .game import Game
@@ -39,6 +41,7 @@ class Builder:
         self.allow_mismatch = allow_mismatch
         self.edited: dict[str, tuple[Asset, bool]] = {}   # package -> (asset, mapped)
         self.patches: dict[str, list[recolor.BytePatch]] = {}
+        self.bulk: dict[str, bytes] = {}                   # package -> its .ubulk (recolored texture copies)
         self.log: list[str] = []
         self.fx_folder = recipe.get("fx_folder", "/PBZVFXPack/VFX/Bladesmith").rstrip("/")
 
@@ -87,22 +90,8 @@ class Builder:
                     else:
                         ops.set_scabbard(self._asset(base.package), i, s.scabbard, s.scabbard_socket)
                         self.log.append(f"  slot {i}: scabbard {s.scabbard.rsplit('/', 1)[1]}")
-        if w.get("blade_albedo"):  # experimental: the "Albedo Controls" vector of the blade's material, per weapon
-            vals = [float(v) for v in w["blade_albedo"]]
-            skin = load_weapon(g, w["skin"], with_fade=False) if "skin" in w else base
-            for i in w.get("slots", list(range(len(base.slots)))):
-                mesh = skin.slots[min(i, len(skin.slots) - 1)].mesh
-                mi = Asset(g.json_of(mesh)).find_imports("MaterialInstanceConstant")
-                if not mi:
-                    raise ops.RecipeError(f"{mesh.rsplit('/', 1)[1]} has no material instance to recolor")
-                src = g.canon(Asset(g.json_of(mesh)).package_of(mi[0]))
-                # r0p2g1b1a0, not 0p2_1_1_0: an FName ending in _<digits> is stored as base + number, which breaks the copy
-                tag = "".join(c + f"{v:g}".replace(".", "p").replace("-", "m") for c, v in zip("rgba", vals))
-                dst = f"{self.fx_folder}/MI/{src.rsplit('/', 1)[1]}_{tag}"
-                if dst not in self.edited:
-                    self.edited[dst] = (recolor.material_copy(g, src, dst, {"Albedo Controls": vals})[0], True)
-                ops.set_blade_material(self._asset(base.slots[i].bp), dst)
-                self.log.append(f"  slot {i}: blade material {dst.rsplit('/', 1)[1]}")
+        if w.get("blade_color"):
+            self._blade_color(base, w)
         if w.get("trails"):
             for line in ops.set_trails(self._asset(base.package), w["trails"], base, g):
                 self.log.append("  " + line)
@@ -139,6 +128,45 @@ class Builder:
             ops.repoint_attached_effect(self._asset(bp), old, new)
             self.log.append(f"  slot {em['slot']}: {old.rsplit('/', 1)[1]} copy with {mesh_to.rsplit('/', 1)[1]} -> {new}")
 
+    def _blade_color(self, base, w: dict) -> None:
+        """One color of the skin's albedo texture replaced, in copies of the texture and material that only this
+        weapon's blades use (the mesh's material is overridden on the blueprint): the same skin elsewhere keeps its
+        colors. Hilt, blade and scabbard share one texture, so a color used on all of them changes on all of them."""
+        g, spec = self.game, w["blade_color"]
+        skin = load_weapon(g, w["skin"], with_fade=False) if "skin" in w else base
+        try:
+            target = texrecolor.hex_rgb(str(spec.get("to", "")))
+        except ValueError as e:
+            raise ops.RecipeError(f"{base.key}: blade_color: {e}") from None
+        for i in w.get("slots", list(range(len(base.slots)))):
+            mesh = skin.slots[min(i, len(skin.slots) - 1)].mesh
+            try:
+                mi, tex, tex_idx = texrecolor.blade_material(g, mesh)
+                uexp, ubulk = texrecolor.texture_files(g, tex)
+                pal = texrecolor.palette(uexp, ubulk)
+            except ValueError as e:
+                raise ops.RecipeError(f"{base.key}: blade_color: {e}") from None
+            hue = float(spec["from"]) if "from" in spec else (pal[0]["hue"] if pal else None)
+            if hue is None:
+                raise ops.RecipeError(f"{base.key}: {tex.rsplit('/', 1)[1]} has no colored areas to replace")
+            # the picked color is what the typical shade of the old one becomes; lighter and darker shades follow
+            near = min(pal, key=lambda p: abs((p["hue"] - hue + 180) % 360 - 180), default=None)
+            bright = max(target) / max(max(near["color"]), 1e-3) if near else 1.0
+            kw = {"hue_from": hue, "hue_width": float(spec.get("width", 40)), "brightness": min(bright, 3.0)}
+            # c<hash>, not a bare hash: an FName ending in _<digits> is stored as base + number, which breaks the copy
+            tag = "c" + hashlib.sha1(json.dumps([tex, target, kw], sort_keys=True).encode()).hexdigest()[:8]
+            tex_dst = f"{self.fx_folder}/T/{tex.rsplit('/', 1)[1]}_{tag}"
+            mi_dst = f"{self.fx_folder}/MI/{mi.rsplit('/', 1)[1]}_{tag}"
+            if tex_dst not in self.edited:
+                copy, bulk = texrecolor.texture_copy(g, tex, tex_dst, texrecolor.recolor_vt(uexp, ubulk, target, **kw))
+                self.edited[tex_dst] = (copy, False)
+                self.bulk[tex_dst] = bulk
+                m = recolor.material_copy(g, mi, mi_dst, {})[0]
+                m.repoint_import(tex_idx, tex_dst, tex_dst.rsplit("/", 1)[1])
+                self.edited[mi_dst] = (m, True)
+            ops.set_blade_material(self._asset(base.slots[i].bp), mi_dst)
+            self.log.append(f"  slot {i}: {tex.rsplit('/', 1)[1]} hue {hue:g} -> {spec['to']}")
+
     def stage_path(self, package: str) -> Path:
         if self.game.has(package):
             rel = self.game.rel(package)
@@ -161,6 +189,8 @@ class Builder:
             js.write_text(a.dump(), encoding="utf-8")
             dst = self.stage_path(pkg)
             tools.from_json(self.game.cfg, js, dst, mapped)
+            if pkg in self.bulk:
+                dst.with_suffix(".ubulk").write_bytes(self.bulk[pkg])
             if pkg in self.patches:
                 recolor.apply_patches(dst.with_suffix(".uexp"), self.patches[pkg])
 
