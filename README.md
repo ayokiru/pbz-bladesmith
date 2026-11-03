@@ -7,6 +7,7 @@
   <img src="https://img.shields.io/badge/python-3.11%2B-2c262d" alt="Python 3.11+">
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-2c262d" alt="Windows 10 and 11">
   <img src="https://img.shields.io/badge/game%20build-5.7.4--301524-2c262d" alt="Game build 5.7.4-301524">
+  <a href="https://www.nexusmods.com/phantombladezero/mods/447"><img src="https://img.shields.io/badge/Nexus%20Mods-Bladesmith-d98f40" alt="Bladesmith on Nexus Mods"></a>
 </p>
 
 Bladesmith lets you keep the weapon you play with and change how it looks. Pick the base weapon for its stats, perks and
@@ -77,7 +78,8 @@ Built with Bladesmith: the [Sanguine Skins](https://www.nexusmods.com/phantombla
 
 ## Download
 
-Get `Bladesmith-0.3.0.zip` from [Releases](https://github.com/ayokiru/pbz-bladesmith/releases), unpack it anywhere and
+Get `Bladesmith-0.3.0.zip` from [Releases](https://github.com/ayokiru/pbz-bladesmith/releases) or
+[Nexus Mods](https://www.nexusmods.com/phantombladezero/mods/447), unpack it anywhere and
 start `Bladesmith.exe`. It finds the game through Steam and asks for the folder if it can't. retoc, UAssetGUI and the
 game's mappings come with it; the one thing to install is the
 [.NET 8 Desktop Runtime (x64)](https://dotnet.microsoft.com/download/dotnet/8.0), and Bladesmith links to it if it is
