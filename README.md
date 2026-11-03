@@ -17,18 +17,19 @@ It reads everything from your own copy of the game and writes only the few files
 ships with Bladesmith, and after a game patch you rebuild your pak from the updated files.
 
 <p align="center">
-  <img src="docs/images/screenshot-builder.png" alt="Bladesmith window: Outlaw Warblade with the Sanguine Reach look, scabbard and crimson trails, and three more weapons in the recipe" width="100%">
+  <img src="docs/images/screenshot-builder.png" alt="Bladesmith window: Outlaw Warblade with the Sanguine Reach look, scabbard and crimson trails, and four more weapons in the recipe" width="100%">
 </p>
 
 ## What it does
 
 - Puts any player weapon's blade model on another weapon of the same type. Dual weapons are handled blade by blade.
   The old model's offset and scale are removed, so the new blade sits right in the hand and in the scabbard.
-- Adds the skin's scabbard. Sanguine, Sanguine Reach and Sanguine Twin have one.
+- Adds the skin's scabbard. Sanguine, Sanguine Reach and Sanguine Twin have one. The base weapon must carry a scabbard
+  in the same spot: the game crashes when a scabbard moves somewhere else, so Bladesmith leaves those out.
 - Swaps the trail of each attack (standard combo, Sha-Chi combo, charged attack, thrusts) for any of about 300 trail
   effects in the game, enemy ones included. The blood trails in Sanguine Skins come from an enemy.
 - Recolors trails with color presets, which write the new colors into copies of the effects. The first preset turns
-  Outlaw Warblade's teal trails crimson.
+  Outlaw Warblade's teal trails crimson. An experimental tint moves any trail to one of six hues.
 - Shows the game's own inventory render on every weapon card and a before/after preview of the weapon you are editing.
 - Warns before you build. Some weapons end their trails with a fade (Outlaw Warblade and eight others), and a trail
   without fade support keeps following the blade while you run, so the trail list marks the ones that fade. Skins from
@@ -38,11 +39,58 @@ ships with Bladesmith, and after a game patch you rebuild your pak from the upda
 Stats, perks, movesets and hitboxes never change. Enemies and bosses keep their own weapons and effects: Bladesmith
 only edits the player's weapon files and puts new effects in a folder of its own.
 
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/screenshot-trails.png" alt="Trails per attack: Jagged Steel with blood ribbons, a red arc and a crimson slash"></td>
+    <td width="50%"><img src="docs/images/screenshot-trail-picker.png" alt="Trail picker with search and element filters"></td>
+  </tr>
+  <tr>
+    <td>A trail for each attack</td>
+    <td>The trail picker: search, element filters and marks for fade, blade and hero trails</td>
+  </tr>
+</table>
+
+## In the game
+
+Built with Bladesmith: the [Sanguine Skins](https://www.nexusmods.com/phantombladezero/mods/399) recipe from
+`examples/`.
+
+<p align="center">
+  <img src="docs/images/ingame-outlaw-warblade.jpg" alt="Outlaw Warblade before and after: the Sanguine Reach model and scabbard" width="100%">
+  <img src="docs/images/ingame-serpent-viper.jpg" alt="White Serpent and Crimson Viper before and after: the Sanguine Twin blades" width="100%">
+</p>
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/images/ingame-crimson-trail.jpg" alt="Outlaw Warblade with its trails recolored crimson"></td>
+    <td width="50%"><img src="docs/images/ingame-blood-trail.jpg" alt="White Serpent and Crimson Viper with blood trails"></td>
+  </tr>
+  <tr>
+    <td>Outlaw Warblade's own trails, recolored crimson</td>
+    <td>Blood trails taken from an enemy weapon</td>
+  </tr>
+</table>
+
 <p align="center">
   <img src="docs/images/screenshot-weapons.png" alt="All 29 player weapons with their in-game renders" width="100%">
 </p>
 
-## Getting started
+## Download
+
+Get `Bladesmith-0.3.0.zip` from [Releases](https://github.com/ayokiru/pbz-bladesmith/releases), unpack it anywhere and
+start `Bladesmith.exe`. It finds the game through Steam and asks for the folder if it can't. retoc, UAssetGUI and the
+game's mappings come with it; the one thing to install is the
+[.NET 8 Desktop Runtime (x64)](https://dotnet.microsoft.com/download/dotnet/8.0), and Bladesmith links to it if it is
+missing.
+
+Close the game before you press **Build & install**, since the game locks the files in `~mods`. Everything you
+installed shows up under **Installed**, where you can open a pak's recipe again or remove it.
+
+<p align="center">
+  <img src="docs/images/screenshot-installed.png" alt="Installed paks: each pak with its weapons, Edit and Remove" width="100%">
+</p>
+
+## Run from source
 
 You need:
 
@@ -69,10 +117,8 @@ Set `game_dir` and the two tool paths in `bladesmith.toml`, and start the window
 python -m bladesmith gui
 ```
 
-The first start takes a few minutes: Bladesmith extracts the weapon assets and checks every trail effect once. Later
-starts take seconds.
-
-Close the game before you press **Build & install**, since the game locks the files in `~mods`.
+The first start takes a few seconds on game build 5.7.4-301524. After a game patch it takes a few minutes once, while
+Bladesmith reads the weapons and checks every trail effect again.
 
 ## Command line
 

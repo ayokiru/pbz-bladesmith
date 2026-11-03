@@ -412,7 +412,8 @@ async function renderInstalled() {
   $("installed-list").replaceChildren(...list.map((p) => {
     const lines = (p.recipe.weapons || []).map((e) => {
       const b = byKey(e.base), s = e.skin ? byKey(e.skin) : null;
-      return el("li", {}, `${b ? b.name : e.base}${s ? " as " + s.name : ""}${e.trail_color ? " \u00B7 " + e.trail_color : ""}${e.trail_tint ? " \u00B7 " + e.trail_tint + " tint" : ""}`);
+      const d = describe(e);
+      return el("li", {}, `${b ? b.name : e.base}${s ? " as " + s.name : ""}${d === "look only" ? "" : " · " + d}`);
     });
     const remove = el("button", { class: "ghost" }, "Remove");
     remove.addEventListener("click", async () => {

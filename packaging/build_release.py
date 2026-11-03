@@ -28,7 +28,7 @@ Weapon transmog builder for Phantom Blade Zero
 https://github.com/ayokiru/pbz-bladesmith
 
 Start Bladesmith.exe. It finds the game through Steam; if it can't, it asks for the game folder.
-The first start reads the weapons from the game and takes a few minutes. Later starts take seconds.
+The first start after a game patch reads the weapons again and takes a few minutes. Otherwise it takes seconds.
 
 Requirements: Windows 10 or 11, the .NET 8 Desktop Runtime (x64), which UAssetGUI needs.
 Bladesmith shows a download button if it is missing.

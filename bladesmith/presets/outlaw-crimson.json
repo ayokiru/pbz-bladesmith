@@ -1,6 +1,6 @@
 {
   "id": "outlaw-crimson",
-  "description": "Outlaw Warblade's own trails, teal green -> crimson. Keeps their UE_StartFade, so nothing lingers while running.",
+  "description": "Outlaw Warblade's own trails, teal green -> crimson. They still fade out, so nothing hangs on the blade while you run.",
   "systems": {
     "NS_Weapon_ZhanMaDao_Blade_B_001": {
       "lut_from": "NS_Weapon_ZhanMaDao_Blade_C_001",
