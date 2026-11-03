@@ -13,9 +13,13 @@ class ToolError(RuntimeError):
     pass
 
 
+# retoc and UAssetGUI are console programs: without this flag a windowed Bladesmith.exe flashes a console per call
+NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
+
 def _run(args: list[str]) -> str:
     r = subprocess.run([str(a) for a in args], capture_output=True, text=True, stdin=subprocess.DEVNULL,
-                       encoding="utf-8", errors="replace")
+                       encoding="utf-8", errors="replace", creationflags=NO_WINDOW)
     if r.returncode != 0:
         raise ToolError(f"{Path(args[0]).name} failed ({r.returncode}): {r.stderr.strip() or r.stdout.strip()}")
     return r.stdout

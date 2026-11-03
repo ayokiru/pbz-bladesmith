@@ -73,7 +73,8 @@ def blade_mesh(game: Game, bp_package: str) -> str | None:
     return a.package_of(idx) if isinstance(idx, int) and idx < 0 else None
 
 
-def load_weapon(game: Game, key: str, with_fade: bool = True) -> Weapon:
+def _parse(game: Game, key: str) -> Weapon:
+    """Slots and trails from the weapon's data asset (blade meshes and fade flags are filled in by _enrich)."""
     pkg = game.weapon_package(key)
     a = Asset(game.json_of(pkg))
     data = a.main_data()
@@ -90,28 +91,36 @@ def load_weapon(game: Game, key: str, with_fade: bool = True) -> Weapon:
         n = vv.get("Particle")
         sysp = a.package_of(n) if isinstance(n, int) and n < 0 else None
         w.trails.append(Trail(tag.removeprefix("Weapon.Trail."), vv.get("WeaponIndex") or 0, vv.get("Slot") or "", sysp))
-    game.ensure([s.bp for s in w.slots if game.has(s.bp)])
+    return w
+
+
+def _enrich(game: Game, w: Weapon, with_fade: bool) -> Weapon:
     for s in w.slots:
         if game.has(s.bp):
             s.mesh = blade_mesh(game, s.bp)
     if with_fade:
-        systems = sorted({t.system for t in w.trails if game.has(t.system)})
-        game.ensure(systems)
         for t in w.trails:
             if game.has(t.system):
                 t.fade = b"UE_StartFade" in game.raw_bytes(t.system)
     return w
 
 
+def load_weapon(game: Game, key: str, with_fade: bool = True) -> Weapon:
+    w = _parse(game, key)
+    game.prefetch([s.bp for s in w.slots])
+    if with_fade:
+        game.ensure([t.system for t in w.trails if game.has(t.system)])
+    return _enrich(game, w, with_fade)
+
+
 def build(game: Game, include_variants: bool = False) -> list[Weapon]:
-    keys = game.weapon_keys()
-    game.ensure([game.weapon_package(k) for k in keys])
-    out = []
-    for k in keys:
-        if VARIANT.search(k) and not include_variants:
-            continue
-        out.append(load_weapon(game, k))
-    return out
+    """All player weapons. Each stage is one retoc run plus parallel JSON conversion, not one run per weapon."""
+    keys = [k for k in game.weapon_keys() if include_variants or not VARIANT.search(k)]
+    game.prefetch([game.weapon_package(k) for k in keys])
+    ws = [_parse(game, k) for k in keys]
+    game.prefetch([s.bp for w in ws for s in w.slots])
+    game.ensure([t.system for w in ws for t in w.trails if game.has(t.system)])
+    return [_enrich(game, w, True) for w in ws]
 
 
 def save(weapons: list[Weapon], path: Path) -> None:
@@ -129,14 +138,29 @@ def load(path: Path) -> list[Weapon]:
     return out
 
 
+PREBUILT = Path(__file__).with_name("data") / "prebuilt.json"
+
+
+def _prebuilt(game: Game, part: str):
+    """Catalog or trail library shipped for the game build the release was made with, if the game matches."""
+    if PREBUILT.exists():
+        d = json.loads(PREBUILT.read_text(encoding="utf-8"))
+        if d.get("fingerprint") == game.fingerprint():
+            return d[part]
+    return None
+
+
 def cached(game: Game) -> list[Weapon]:
-    """Catalog from the cache, built on first use."""
+    """Catalog from the cache; on first use from the shipped copy, or built from the game after a patch."""
     p = game.cfg.cache_dir / "catalog.json"
-    if p.exists():
-        return load(p)
-    ws = build(game)
-    save(ws, p)
-    return ws
+    if not p.exists():
+        pre = _prebuilt(game, "catalog")
+        if pre is not None:
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(json.dumps(pre, ensure_ascii=False), encoding="utf-8")
+        else:
+            save(build(game), p)
+    return load(p)
 
 
 TRAIL_NAME = re.compile(r"trail", re.I)
@@ -151,6 +175,10 @@ def trail_library(game: Game, weapons: list[Weapon]) -> dict[str, dict]:
     p = game.cfg.cache_dir / "trails.json"
     if p.exists():
         return json.loads(p.read_text(encoding="utf-8"))
+    pre = _prebuilt(game, "trails")
+    if pre is not None:
+        p.write_text(json.dumps(pre), encoding="utf-8")
+        return pre
     player = {game.canon(t.system) for w in weapons for t in w.trails
               if game.has(t.system) and not t.tag.startswith("Kick")}
     others = {m for m in game.files if m.rsplit("/", 1)[1].startswith("NS_")

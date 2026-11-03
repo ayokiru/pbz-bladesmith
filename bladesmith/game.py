@@ -48,6 +48,10 @@ class Game:
     def has(self, package: str | None) -> bool:
         return bool(package) and self.canon(package) is not None
 
+    def fingerprint(self) -> str:
+        """Changes whenever a game patch changes the containers (total size of the .utoc tables)."""
+        return str(sum(f.stat().st_size for f in self.cfg.paks_dir.glob("*.utoc")))
+
     # --- lookup -----------------------------------------------------------------------------------
     def resolve(self, name_or_path: str) -> str:
         """Asset name (NS_Foo) or package path (/Plugin/.../NS_Foo) -> package path."""
@@ -94,6 +98,14 @@ class Game:
         if not js.exists():
             tools.to_json(self.cfg, self.legacy_file(package), js, mapped)
         return json.loads(js.read_text(encoding="utf-8-sig"))
+
+    def prefetch(self, packages: list[str], mapped: bool = True) -> None:
+        """Extract in one retoc run, then convert to JSON. Conversions stay sequential: parallel UAssetGUI runs
+        race on the mappings and silently return unparsed (raw) exports."""
+        packages = sorted({p for p in packages if self.has(p)})
+        self.ensure(packages)
+        for p in packages:
+            self.json_of(p, mapped)
 
     def raw_bytes(self, package: str) -> bytes:
         f = self.legacy_file(package)
