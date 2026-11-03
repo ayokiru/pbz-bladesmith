@@ -12,7 +12,7 @@ from pathlib import Path
 
 import webview
 
-from . import catalog, config, images, recipe
+from . import catalog, config, images, recipe, texrecolor
 from .config import Config, ConfigError
 from .game import Game
 from .recolor import PRESET_DIR, TINTS
@@ -166,6 +166,17 @@ class Api:
             except Exception as e:
                 self._file_log("build failed\n" + traceback.format_exc())
                 return {"ok": False, "error": f"{e} (details in {LOG_FILE})"}
+
+    def blade_palette(self, key: str) -> dict:
+        """The colored areas of a look's blade texture, for "Blade color" (first call per look reads ~12 MB)."""
+        with self._lock:
+            try:
+                slots = catalog.load_weapon(self._game, key, with_fade=False).slots
+                _, tex, _ = texrecolor.blade_material(self._game, slots[0].mesh)
+                return {"ok": True, "colors": texrecolor.palette(*texrecolor.texture_files(self._game, tex))}
+            except Exception as e:
+                self._file_log(f"palette of {key} failed\n" + traceback.format_exc())
+                return {"ok": False, "error": str(e)}
 
     def installed(self) -> list[dict]:
         """Paks this program installed that are still in ~mods (entries for paks deleted by hand are dropped)."""

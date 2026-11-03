@@ -143,6 +143,45 @@ function renderPreview() {
   $("color-hint").textContent = "";
   S.trailChoice = {};
   renderTrailRows();
+  S.bladeFrom = null;
+  renderBlade();
+}
+
+// ---------- blade color ----------
+const hex = (rgb) => "#" + rgb.map((v) => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, "0")).join("");
+const gray = (rgb, k) => hex(Array(3).fill(Math.max(...rgb) * k));
+
+async function renderBlade() {
+  const look = byKey(S.skin || S.base);
+  const box = $("blade-from");
+  $("blade-opt").hidden = !look.skinnable;
+  if (!look.skinnable) return;
+  S.palettes = S.palettes || {};
+  if (!S.palettes[look.key]) {
+    box.replaceChildren(el("span", { class: "muted" }, "Reading the blade's colors..."));
+    $("blade-to").hidden = true;
+    const res = await window.pywebview.api.blade_palette(look.key);
+    if (look.key !== (S.skin || S.base)) return;  // the pick changed while reading
+    S.palettes[look.key] = res.ok ? res.colors : [];
+    if (!res.ok) $("blade-hint").textContent = "Can't read this look's colors: " + res.error;
+  }
+  const colors = S.palettes[look.key];
+  const pick = (hue) => { S.bladeFrom = hue; renderBlade(); };
+  const sw = (on, label, color, onclick, title) => el("button", { type: "button", class: `swatch${on ? " on" : ""}`,
+    "aria-pressed": String(on), title, onclick }, color ? el("i", { style: `background:${color}` }) : null, label);
+  box.replaceChildren(sw(S.bladeFrom === null, "Original", null, () => pick(null)),
+    ...colors.map((c) => sw(S.bladeFrom === c.hue, `${Math.round(c.share * 100)}%`, hex(c.color), () => {
+      if (S.bladeFrom !== c.hue) $("blade-color").value = gray(c.color, 1);
+      pick(c.hue);
+    }, "Replace this color")));
+  const src = colors.find((c) => c.hue === S.bladeFrom);
+  $("blade-to").hidden = !src;
+  if (src) $("blade-quick").replaceChildren(...[["Gray", 1], ["Dark", 0.35]].map(([label, k]) =>
+    sw($("blade-color").value === gray(src.color, k), label, gray(src.color, k),
+      () => { $("blade-color").value = gray(src.color, k); renderBlade(); })));
+  $("blade-hint").textContent = !colors.length ? "This look has no colored areas to replace: plain metal and wood can't be told apart."
+    : src ? "Every part drawn in this color changes, so a hilt or scabbard in the same color changes too. Only this weapon is affected."
+    : "Pick a color of the look to replace. The percentage is how much of its colored surface uses it.";
 }
 
 // ---------- trail picker ----------
@@ -280,6 +319,11 @@ function loadEntry(e) {
   $("color").value = e.trail_color ? "preset:" + e.trail_color : e.trail_tint ? "tint:" + e.trail_tint : "";
   S.trailChoice = { ...(e.trails || {}) };
   renderTrailRows();
+  if (e.blade_color) {
+    S.bladeFrom = e.blade_color.from;
+    $("blade-color").value = e.blade_color.to;
+    renderBlade();
+  }
 }
 
 // ---------- recipe ----------
@@ -296,6 +340,7 @@ function currentEntry() {
   const [kind, id] = $("color").value.split(":");
   if (kind === "preset") e.trail_color = id;
   if (kind === "tint") e.trail_tint = id;
+  if (S.bladeFrom !== null && byKey(S.skin || S.base).skinnable) e.blade_color = { from: S.bladeFrom, to: $("blade-color").value };
   return e;
 }
 
@@ -305,6 +350,7 @@ function describe(e) {
   if (e.trails) bits.push(`${Object.keys(e.trails).length} trail${Object.keys(e.trails).length > 1 ? "s" : ""}`);
   if (e.trail_color) bits.push(e.trail_color);
   if (e.trail_tint) bits.push(e.trail_tint + " tint");
+  if (e.blade_color) bits.push("blade " + e.blade_color.to);
   return bits.join(" · ") || "look only";
 }
 
@@ -461,6 +507,7 @@ async function boot() {
     $("color-hint").textContent = p ? p.description : kind === "tint"
       ? `Experimental. Every colored part of this weapon's trails turns ${id}. Some effects keep a bit of their old color, and you'll only see that in the game.` : "";
   });
+  $("blade-color").addEventListener("input", renderBlade);
   $("picker-close").replaceChildren(icon("x"));
   $("picker-close").addEventListener("click", closePicker);
   $("picker-shade").addEventListener("click", closePicker);

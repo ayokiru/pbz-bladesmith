@@ -53,7 +53,7 @@
       <ol>
         <li><b>Pick a base weapon.</b> It keeps its stats, perks and moveset.</li>
         <li><b>Pick a look.</b> Its blade, and its scabbard if it has one.</li>
-        <li><b>Change trails or their color</b> if you like, then add it to the recipe.</li>
+        <li><b>Change the blade's color or the trails</b> if you like, then add it to the recipe.</li>
         <li><b>Build &amp; install</b> with the game closed.</li>
       </ol>
     </div>
@@ -67,6 +67,16 @@
 
       <div class="opt">
         <label class="toggle"><input type="checkbox" id="scabbard" checked><span></span>Use the skin's scabbard</label>
+      </div>
+      <div class="opt" id="blade-opt">
+        <label>Blade color <small class="exp">experimental</small></label>
+        <div class="swatches" id="blade-from" role="group" aria-label="Color to replace"></div>
+        <div class="blade-to" id="blade-to" hidden>
+          <span class="muted">becomes</span>
+          <div class="swatches" id="blade-quick"></div>
+          <input type="color" id="blade-color" aria-label="New color">
+        </div>
+        <div class="hint" id="blade-hint"></div>
       </div>
       <div class="opt" id="color-opt">
         <label>Trail color</label>
