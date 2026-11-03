@@ -120,6 +120,8 @@ class Api:
         with self._lock:
             try:
                 name = recipe.pak_name(r)
+                if install and name not in self._registry() and any((self._cfg.mods_dir / (name + e)).exists() for e in PAK_EXT):
+                    return {"ok": False, "error": f"~mods already has a {name} that Bladesmith did not make. Pick another pak name."}
                 out = self._cfg.cache_dir.parent / "out" / name
                 self._log(f"Building {name}...")
                 utoc, log = recipe.run(self._game, r, self._cfg.cache_dir / "stage", out, allow_mismatch=True)

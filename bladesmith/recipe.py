@@ -35,7 +35,7 @@ def _kind_family(kind: str) -> str:
 
 class Builder:
     def __init__(self, game: Game, recipe: dict, stage: Path, allow_mismatch: bool = False):
-        self.game, self.r, self.stage = game, recipe, stage
+        self.game, self.stage = game, stage
         self.allow_mismatch = allow_mismatch
         self.edited: dict[str, tuple[Asset, bool]] = {}   # package -> (asset, mapped)
         self.patches: dict[str, list[recolor.BytePatch]] = {}
@@ -46,6 +46,13 @@ class Builder:
         if package not in self.edited:
             self.edited[package] = (Asset(self.game.json_of(package, mapped)), mapped)
         return self.edited[package][0]
+
+    def _add_copies(self, effects: list, materials: dict) -> None:
+        for e in effects:
+            self.edited[e.target] = (e.asset, False)   # Niagara copies: raw JSON, lossless
+            self.patches[e.target] = e.patches
+        for pkg, a in materials.items():
+            self.edited[pkg] = (a, True)
 
     def weapon(self, w: dict) -> None:
         g = self.game
@@ -82,13 +89,9 @@ class Builder:
         if w.get("trail_color"):
             preset = recolor.load_preset(w["trail_color"])
             remap, effects, materials = recolor.plan(g, preset, self.fx_folder)
-            for line in ops.retarget_trails(self._asset(base.package), remap, g.canon):
+            for line in ops.retarget_trails(self._asset(base.package), remap, g.canon, f"trail_color {preset['id']}"):
                 self.log.append(f"  {line} ({preset['id']})")
-            for e in effects:
-                self.edited[e.target] = (e.asset, False)
-                self.patches[e.target] = e.patches
-            for pkg, a in materials.items():
-                self.edited[pkg] = (a, True)
+            self._add_copies(effects, materials)
         if w.get("trail_tint"):
             data = self._asset(base.package)
             systems = []
@@ -99,13 +102,9 @@ class Builder:
                 if isinstance(idx, int) and idx < 0 and g.has(data.package_of(idx)):
                     systems.append(g.canon(data.package_of(idx)))
             remap, effects, materials = recolor.tint_plan(g, sorted(set(systems)), w["trail_tint"], self.fx_folder)
-            for line in ops.retarget_trails(data, remap, g.canon):
+            for line in ops.retarget_trails(data, remap, g.canon, f"trail_tint {w['trail_tint']}"):
                 self.log.append(f"  {line} (tint {w['trail_tint']})")
-            for e in effects:
-                self.edited[e.target] = (e.asset, False)
-                self.patches[e.target] = e.patches
-            for pkg, a in materials.items():
-                self.edited[pkg] = (a, True)
+            self._add_copies(effects, materials)
         for em in w.get("effect_meshes", []):
             if not 0 <= em.get("slot", -1) < len(base.slots) or not base.slots[em["slot"]].bp:
                 raise ops.RecipeError(f"{base.key}: effect_meshes slot {em.get('slot')} has no blade blueprint")

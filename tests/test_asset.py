@@ -53,5 +53,51 @@ class TintTests(unittest.TestCase):
         self.assertAlmostEqual(colorsys.rgb_to_hsv(r / 4, g / 4, b / 4)[0] * 360, 212, delta=1)
 
 
+class SafetyTests(unittest.TestCase):
+    """The three places that silently damage data when they break."""
+
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+        from bladesmith.config import Config
+        self.root = Path(tempfile.mkdtemp())
+        paks = self.root / "PBZ" / "ProjectPBZ" / "Content" / "Paks"
+        (paks / "~mods").mkdir(parents=True)
+        (paks / "a.utoc").write_bytes(b"v1")
+        self.cfg = Config(self.root / "PBZ", "0x0", Path("retoc.exe"), Path("UAssetGUI.exe"), "PBZ", self.root / "cache")
+
+    def test_cache_is_wiped_after_a_game_patch(self):
+        from unittest import mock
+        from bladesmith import game
+        with mock.patch.object(game.tools, "list_game_files", return_value=[]):
+            game.Game(self.cfg)
+            old = self.cfg.cache_dir / "legacy" / "old.uasset"
+            old.parent.mkdir(parents=True)
+            old.write_bytes(b"x")
+            game.Game(self.cfg)                      # same game: cache kept
+            self.assertTrue(old.exists())
+            (self.cfg.paks_dir / "a.utoc").write_bytes(b"v2")   # patch
+            game.Game(self.cfg)
+            self.assertFalse(old.exists())
+
+    def test_install_never_overwrites_a_foreign_pak(self):
+        from unittest import mock
+        from bladesmith import app
+        (self.cfg.mods_dir / "zzz_Other_P.pak").write_bytes(b"theirs")
+        with mock.patch.object(app, "INSTALLED", self.root / "installed.json"):
+            res = app.Api(self.cfg).build({"pak_name": "zzz_Other_P", "weapons": [{"base": "Iron"}]}, True)
+        self.assertFalse(res["ok"])
+        self.assertEqual((self.cfg.mods_dir / "zzz_Other_P.pak").read_bytes(), b"theirs")
+
+    def test_shared_color_curve_is_tinted_everywhere(self):
+        from bladesmith.recolor import BytePatch, PresetError, apply_patches
+        f = self.root / "x.uexp"
+        f.write_bytes(b"..AAAA..AAAA..")
+        apply_patches(f, [BytePatch("lut", b"AAAA", b"BBBB", every=True)])
+        self.assertEqual(f.read_bytes(), b"..BBBB..BBBB..")
+        with self.assertRaises(PresetError):                 # presets stay strict
+            apply_patches(f, [BytePatch("lut", b"BBBB", b"CCCC")])
+
+
 if __name__ == "__main__":
     unittest.main()

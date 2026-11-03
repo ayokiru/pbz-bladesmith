@@ -1,13 +1,26 @@
 """Index of the game's packages, and access to extracted copies of them."""
 from __future__ import annotations
 
+import hashlib
 import json
+import shutil
 from pathlib import Path
 
 from . import tools
 from .config import Config
 
 WEAPON_DIR = "/PBZCombatAsset/ActorData/Players/Hun/Weapon/"
+# everything in the cache that comes from the game; wiped when a patch changes the game
+GAME_DERIVED = ("legacy", "json", "img", "stage", "edit", "index.json", "catalog.json", "trails.json")
+
+
+def game_fingerprint(paks_dir: Path) -> str:
+    """Hash of the container tables: any patch that changes an asset changes its entry in a .utoc."""
+    h = hashlib.sha1()
+    for f in sorted(paks_dir.glob("*.utoc")):
+        h.update(f.name.encode())
+        h.update(f.read_bytes())
+    return h.hexdigest()[:16]
 
 
 def mount_of(rel: str) -> str:
@@ -27,6 +40,14 @@ class Game:
         self.cfg = cfg
         self.legacy = cfg.cache_dir / "legacy"
         self.json_dir = cfg.cache_dir / "json"
+        self._fingerprint = game_fingerprint(cfg.paks_dir)
+        stamp = cfg.cache_dir / "game.txt"
+        if not stamp.exists() or stamp.read_text(encoding="utf-8") != self._fingerprint:
+            for name in GAME_DERIVED:  # never reuse assets extracted from another game version
+                p = cfg.cache_dir / name
+                shutil.rmtree(p, ignore_errors=True) if p.is_dir() else p.unlink(missing_ok=True)
+            cfg.cache_dir.mkdir(parents=True, exist_ok=True)
+            stamp.write_text(self._fingerprint, encoding="utf-8")
         idx = cfg.cache_dir / "index.json"
         if idx.exists():
             self.files: dict[str, str] = json.loads(idx.read_text(encoding="utf-8"))
@@ -49,8 +70,7 @@ class Game:
         return bool(package) and self.canon(package) is not None
 
     def fingerprint(self) -> str:
-        """Changes whenever a game patch changes the containers (total size of the .utoc tables)."""
-        return str(sum(f.stat().st_size for f in self.cfg.paks_dir.glob("*.utoc")))
+        return self._fingerprint
 
     # --- lookup -----------------------------------------------------------------------------------
     def resolve(self, name_or_path: str) -> str:

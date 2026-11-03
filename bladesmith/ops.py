@@ -89,7 +89,7 @@ def repoint_attached_effect(bp: Asset, old_pkg: str, new_pkg: str) -> None:
     bp.repoint_import(hits[0], new_pkg, new_pkg.rsplit("/", 1)[1])
 
 
-def retarget_trails(data_asset: Asset, remap: dict[str, str], canon) -> list[str]:
+def retarget_trails(data_asset: Asset, remap: dict[str, str], canon, source: str) -> list[str]:
     """Point every trail that uses a system in `remap` (original package -> copy package) at the copy."""
     report = []
     tr = prop(data_asset.main_data(), "Trails")["Value"]
@@ -104,5 +104,5 @@ def retarget_trails(data_asset: Asset, remap: dict[str, str], canon) -> list[str
             part["Value"] = data_asset.add_object_import(dst, dst.rsplit("/", 1)[1], "NiagaraSystem", "/Script/Niagara")
             report.append(f"{key['Value'][0]['Value'].removeprefix('Weapon.Trail.')} -> {dst}")
     if not report:
-        raise RecipeError("trail_color: none of this weapon's trails is covered by the preset")
+        raise RecipeError(f"{source}: none of this weapon's trails can be recolored this way")
     return report

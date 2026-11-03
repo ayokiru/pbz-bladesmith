@@ -68,6 +68,7 @@ class BytePatch:
     label: str
     old: bytes
     new: bytes
+    every: bool = False   # True: replace every occurrence (a color curve two emitters share gets the same tint)
 
 
 @dataclass
@@ -132,10 +133,12 @@ def apply_patches(uexp: Path, patches: list[BytePatch]) -> None:
     buf = bytearray(uexp.read_bytes())
     for p in patches:
         n = buf.count(p.old)
-        if n != 1:
+        if n == 0 or (n > 1 and not p.every):
             raise PresetError(f"{uexp.name}: '{p.label}' found {n} times, expected exactly once")
-        i = buf.find(p.old)
-        buf[i:i + len(p.old)] = p.new
+        buf = bytearray(bytes(buf).replace(p.old, p.new)) if p.every else buf
+        if not p.every:
+            i = buf.find(p.old)
+            buf[i:i + len(p.old)] = p.new
     uexp.write_bytes(bytes(buf))
 
 
@@ -215,8 +218,11 @@ def tint_plan(game: Game, systems: list[str], tint: str, fx_folder: str) -> tupl
     folder = f"{fx_folder.rstrip('/')}/{tint}"
     remap, effects, materials, mi_targets = {}, [], {}, {}
     game.prefetch(systems)
+    raws = {src: Asset(game.json_of(src, mapped=False)) for src in systems}
+    game.prefetch([game.canon(raw.package_of(i)) for raw in raws.values() for i in raw.find_imports("MaterialInstanceConstant")
+                   if game.has(raw.package_of(i))])
     for src in systems:
-        raw = Asset(game.json_of(src, mapped=False))
+        raw = raws[src]
         for i in raw.find_imports("MaterialInstanceConstant"):
             mi = raw.package_of(i)
             if mi in mi_targets or not game.has(mi):
@@ -235,7 +241,7 @@ def tint_plan(game: Game, systems: list[str], tint: str, fx_folder: str) -> tupl
                 for k in range(0, len(lut) - 3, 4):
                     new += [*tint_rgb(*lut[k:k + 3], hue), lut[k + 3]]
                 if new != lut:
-                    eff.patches.append(BytePatch(f"{e['ObjectName']} LUT", _floats(*lut), _floats(*new)))
+                    eff.patches.append(BytePatch(f"{e['ObjectName']} LUT", _floats(*lut), _floats(*new), every=True))
         effects.append(eff)
         remap[src] = dst
     return remap, effects, materials
