@@ -31,9 +31,9 @@ ships with Bladesmith, and after a game patch you rebuild your pak from the upda
   effects in the game, enemy ones included. The blood trails in Sanguine Skins come from an enemy.
 - Recolors trails with color presets, which write the new colors into copies of the effects. The first preset turns
   Outlaw Warblade's teal trails crimson. An experimental tint moves any trail to one of six hues.
-- Changes one color of a blade (experimental). Pick one of the look's colors, for example Sanguine's red, and the
-  color it becomes. Only that weapon changes: it gets its own copy of the texture. Hilt, blade and scabbard share one
-  texture, so a part painted in the same color changes with it. Plain steel and wood have no color to pick.
+- Changes one color of a blade (experimental). Pick one of the look's colors, for example Sanguine's red, and what it
+  becomes. Only that weapon changes, because it gets its own copy of the texture. Hilt, blade and scabbard use one
+  texture, so every part painted in that color changes together. Plain steel and wood have no color to pick.
 - Shows the game's own inventory render on every weapon card and a before/after preview of the weapon you are editing.
 - Warns before you build. Some weapons end their trails with a fade (Outlaw Warblade and eight others), and a trail
   without fade support keeps following the blade while you run, so the trail list marks the ones that fade. Skins from
@@ -177,9 +177,9 @@ Each pak needs its own name. Two paks that change the same weapon conflict; paks
 Bladesmith converts the needed packages with retoc, edits them as JSON through UAssetGUI, and packs the result into
 an IoStore pak. A blade skin points the weapon's blueprint at another skeletal mesh; scabbards and trails are fields
 in the weapon's data asset. Trail colors live in material instances, in constants baked into the effect's scripts and
-in color curves, so a preset patches all three in copies of the effect. A blade color edits the compressed texture
-blocks directly (DXT1/DXT5 endpoints, no re-encoding) in a copy of the texture, points a copy of the material at it,
-and sets that material on the weapon's blueprint.
+in color curves, so a preset patches all three in copies of the effect. A blade color changes the endpoint colors of
+the compressed DXT1/DXT5 blocks in a copy of the texture, so the texture is never decoded and encoded again. A copy
+of the material points at that texture, and the weapon's blueprint uses the copied material.
 
 The examples rebuild the [Sanguine Skins](https://www.nexusmods.com/phantombladezero/mods/399) mod, and every file
 matches the hand-made version that was tested in the game byte for byte. `python dev/parity.py` compares a build with
