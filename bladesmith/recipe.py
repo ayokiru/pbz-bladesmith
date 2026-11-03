@@ -87,6 +87,22 @@ class Builder:
                     else:
                         ops.set_scabbard(self._asset(base.package), i, s.scabbard, s.scabbard_socket)
                         self.log.append(f"  slot {i}: scabbard {s.scabbard.rsplit('/', 1)[1]}")
+        if w.get("blade_albedo"):  # experimental: the "Albedo Controls" vector of the blade's material, per weapon
+            vals = [float(v) for v in w["blade_albedo"]]
+            skin = load_weapon(g, w["skin"], with_fade=False) if "skin" in w else base
+            for i in w.get("slots", list(range(len(base.slots)))):
+                mesh = skin.slots[min(i, len(skin.slots) - 1)].mesh
+                mi = Asset(g.json_of(mesh)).find_imports("MaterialInstanceConstant")
+                if not mi:
+                    raise ops.RecipeError(f"{mesh.rsplit('/', 1)[1]} has no material instance to recolor")
+                src = g.canon(Asset(g.json_of(mesh)).package_of(mi[0]))
+                # r0p2g1b1a0, not 0p2_1_1_0: an FName ending in _<digits> is stored as base + number, which breaks the copy
+                tag = "".join(c + f"{v:g}".replace(".", "p").replace("-", "m") for c, v in zip("rgba", vals))
+                dst = f"{self.fx_folder}/MI/{src.rsplit('/', 1)[1]}_{tag}"
+                if dst not in self.edited:
+                    self.edited[dst] = (recolor.material_copy(g, src, dst, {"Albedo Controls": vals})[0], True)
+                ops.set_blade_material(self._asset(base.slots[i].bp), dst)
+                self.log.append(f"  slot {i}: blade material {dst.rsplit('/', 1)[1]}")
         if w.get("trails"):
             for line in ops.set_trails(self._asset(base.package), w["trails"], base, g):
                 self.log.append("  " + line)

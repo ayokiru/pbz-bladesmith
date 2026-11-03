@@ -121,7 +121,8 @@ class Game:
             data = json.loads(js.read_text(encoding="utf-8-sig"))
             # UAssetGUI falls back to unparsed exports when it can't use the mappings; versions up to 0.3.1 cached
             # such files on every PC but the developer's, so a cached one is converted again before giving up
-            if not mapped or not any("RawExport" in str(e.get("$type", "")) for e in data.get("Exports", [])):
+            # without mappings *every* export is raw; a parsed asset can still have one (a skeletal mesh itself is)
+            if not mapped or not all("RawExport" in str(e.get("$type", "")) for e in data.get("Exports", [])):
                 return data
             js.unlink()
         raise tools.ToolError(f"UAssetGUI couldn't read {package.rsplit('/', 1)[-1]} with the game mappings ({self.cfg.mappings})")

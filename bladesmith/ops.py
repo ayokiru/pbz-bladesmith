@@ -27,6 +27,20 @@ def set_blade_mesh(bp: Asset, mesh_package: str) -> list[str]:
     return dropped
 
 
+def set_blade_material(bp: Asset, mi_package: str) -> None:
+    """Give the blueprint's 'Weapon Mesh' its own material for slot 0 (OverrideMaterials), so only this weapon
+    changes color; the mesh and every other weapon using it keep the original material."""
+    wm = bp.export("Weapon Mesh")
+    idx = bp.add_object_import(mi_package, mi_package.rsplit("/", 1)[1], "MaterialInstanceConstant", "/Script/Engine")
+    bp.ensure_name("OverrideMaterials")
+    item = {"$type": "UAssetAPI.PropertyTypes.Objects.ObjectPropertyData, UAssetAPI", "Name": "0", "ArrayIndex": 0,
+            "PropertyGuid": None, "IsZero": False, "PropertyTagFlags": "None", "PropertyTypeName": None,
+            "PropertyTagExtensions": "NoExtension", "Value": idx}
+    override = {**item, "$type": "UAssetAPI.PropertyTypes.Objects.ArrayPropertyData, UAssetAPI",
+                "ArrayType": "ObjectProperty", "Name": "OverrideMaterials", "Value": [item]}
+    wm["Data"] = [p for p in wm["Data"] if p["Name"] != "OverrideMaterials"] + [override]
+
+
 def set_scabbard(data_asset: Asset, slot: int, mesh_package: str, socket: str) -> None:
     dd = prop(data_asset.main_data(), "Display Data")["Value"]
     entry = dd[slot]["Value"]
