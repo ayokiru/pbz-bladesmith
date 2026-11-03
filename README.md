@@ -54,6 +54,11 @@ only edits the player's weapon files and puts new effects in a folder of its own
   </tr>
 </table>
 
+<p align="center">
+  <img src="docs/images/screenshot-blade-color.png" alt="Blade color: Jagged Steel with the Sanguine look and its red turned dark, three more weapons in the recipe with their own blade colors" width="100%">
+  <br><sub>Blade color: pick one of the look's colors and what it becomes</sub>
+</p>
+
 ## In the game
 
 Built with Bladesmith: the [Sanguine Skins](https://www.nexusmods.com/phantombladezero/mods/399) recipe from
