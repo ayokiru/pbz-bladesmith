@@ -78,7 +78,7 @@ Built with Bladesmith: the [Sanguine Skins](https://www.nexusmods.com/phantombla
 
 ## Download
 
-Get `Bladesmith-0.3.0.zip` from [Releases](https://github.com/ayokiru/pbz-bladesmith/releases) or
+Get the latest `Bladesmith-*.zip` from [Releases](https://github.com/ayokiru/pbz-bladesmith/releases) or
 [Nexus Mods](https://www.nexusmods.com/phantombladezero/mods/447), unpack it anywhere and
 start `Bladesmith.exe`. It finds the game through Steam and asks for the folder if it can't. retoc, UAssetGUI and the
 game's mappings come with it; the one thing to install is the

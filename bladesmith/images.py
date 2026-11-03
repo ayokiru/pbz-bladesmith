@@ -55,8 +55,12 @@ def decode_texture(uasset: Path) -> Image.Image:
 def render_paths(game: Game) -> dict[str, str]:
     """Weapon key -> render texture package, from the UI weapon table."""
     a = Asset(game.json_of(WEAPON_TABLE))
+    table = next((e["Table"] for e in a.j["Exports"] if "Table" in e), None)
+    if table is None:
+        kinds = ", ".join(str(e.get("$type", "?")).split(",")[0].rsplit(".", 1)[-1] for e in a.j["Exports"])
+        raise RuntimeError(f"{WEAPON_TABLE.rsplit('/', 1)[-1]} has no readable table (exports: {kinds or 'none'})")
     out = {}
-    for row in a.j["Exports"][0]["Table"]["Data"]:
+    for row in table["Data"]:
         v = {p["Name"]: p.get("Value") for p in row["Value"]}
         cfg, render = v.get("WeaponConfig"), v.get("RenderIcon")
         if not (isinstance(cfg, dict) and isinstance(render, dict)):

@@ -6,6 +6,7 @@ import json
 import os
 import shutil
 import threading
+import traceback
 from datetime import datetime
 from pathlib import Path
 
@@ -18,6 +19,7 @@ from .recolor import PRESET_DIR, TINTS
 
 WEB = Path(__file__).with_name("web")
 INSTALLED = config.USER_DIR / "installed.json"
+LOG_FILE = config.USER_DIR / "bladesmith.log"  # what users attach to a bug report
 PAK_EXT = (".pak", ".utoc", ".ucas")
 
 
@@ -34,7 +36,17 @@ class Api:
         self._lock = threading.Lock()
 
     # --- helpers --------------------------------------------------------------------------------------
+    @staticmethod
+    def _file_log(text: str) -> None:
+        try:
+            LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+            with open(LOG_FILE, "a", encoding="utf-8") as f:
+                f.write(f"{datetime.now():%Y-%m-%d %H:%M:%S} {text}\n")
+        except OSError:
+            pass
+
     def _log(self, msg: str) -> None:
+        self._file_log(msg)
         if self._window:
             try:
                 self._window.evaluate_js(f"window.onLog && window.onLog({json.dumps(msg)})")
@@ -58,6 +70,13 @@ class Api:
     def init(self) -> dict:
         """Everything the page needs, or {"setup": ...} when the game or a requirement is missing.
         The first run extracts weapon assets from the game (a few minutes)."""
+        try:
+            return self._init()
+        except Exception as e:
+            self._file_log("init failed\n" + traceback.format_exc())
+            raise RuntimeError(f"{type(e).__name__}: {e}. Details are in {LOG_FILE}") from None
+
+    def _init(self) -> dict:
         with self._lock:
             if self._cfg is None:
                 try:
@@ -73,7 +92,12 @@ class Api:
                 self._log("First run: indexing trail effects (a few minutes)...")
             lib = catalog.trail_library(self._game, ws)
             self._log("Loading weapon pictures...")
-            imgs = images.weapon_images(self._game)
+            try:
+                imgs = images.weapon_images(self._game)
+            except Exception as e:  # pictures are a nicety: the builder works without them
+                self._file_log("weapon pictures failed\n" + traceback.format_exc())
+                self._log(f"No weapon pictures this time ({type(e).__name__}: {e}). Details are in {LOG_FILE}")
+                imgs = {}
             names = catalog.display_names()
             presets = [json.loads(p.read_text(encoding="utf-8")) for p in sorted(PRESET_DIR.glob("*.json"))]
             weapons = []
@@ -140,7 +164,8 @@ class Api:
             except PermissionError:
                 return {"ok": False, "error": "A mod file is locked. Close the game and try again."}
             except Exception as e:
-                return {"ok": False, "error": str(e)}
+                self._file_log("build failed\n" + traceback.format_exc())
+                return {"ok": False, "error": f"{e} (details in {LOG_FILE})"}
 
     def installed(self) -> list[dict]:
         """Paks this program installed that are still in ~mods (entries for paks deleted by hand are dropped)."""

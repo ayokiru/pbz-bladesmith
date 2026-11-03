@@ -99,5 +99,16 @@ class SafetyTests(unittest.TestCase):
             apply_patches(f, [BytePatch("lut", b"BBBB", b"CCCC")])
 
 
+class ImageTableTests(unittest.TestCase):
+    def test_unreadable_weapon_table_names_the_export(self):
+        # a user's run got the weapon table without its rows (KeyError 'Table' on the loading screen)
+        from unittest import mock
+        from bladesmith import images
+        game = mock.Mock()
+        game.json_of.return_value = {"NameMap": [], "Imports": [], "Exports": [{"$type": "UAssetAPI.ExportTypes.RawExport, UAssetAPI"}]}
+        with self.assertRaisesRegex(RuntimeError, "no readable table.*RawExport"):
+            images.render_paths(game)
+
+
 if __name__ == "__main__":
     unittest.main()
