@@ -31,6 +31,9 @@ ships with Bladesmith, and after a game patch you rebuild your pak from the upda
   effects in the game, enemy ones included. The blood trails in Sanguine Skins come from an enemy.
 - Recolors trails with color presets, which write the new colors into copies of the effects. The first preset turns
   Outlaw Warblade's teal trails crimson. An experimental tint moves any trail to one of six hues.
+- Changes one color of a blade (experimental). Pick one of the look's colors, for example Sanguine's red, and the
+  color it becomes. Only that weapon changes: it gets its own copy of the texture. Hilt, blade and scabbard share one
+  texture, so a part painted in the same color changes with it. Plain steel and wood have no color to pick.
 - Shows the game's own inventory render on every weapon card and a before/after preview of the weapon you are editing.
 - Warns before you build. Some weapons end their trails with a fade (Outlaw Warblade and eight others), and a trail
   without fade support keeps following the blade while you run, so the trail list marks the ones that fade. Skins from
@@ -146,6 +149,7 @@ The window saves the same JSON, so you can start there and edit the file afterwa
      "trails": {"Normal.A": "NS_JinYe_BloodTrail_101"}},
     {"base": "LuanYing_Evolution", "skin": "Tang", "slots": [0], "scabbard": true},
     {"base": "ZhanMaBlade", "skin": "Long", "scabbard": true, "trail_color": "outlaw-crimson"},
+    {"base": "WoodenSword", "skin": "Tang", "blade_color": {"to": "#7a7a7a"}},
     {"base": "SnakeDual", "skin": "Double", "scabbard": true,
      "effect_meshes": [{"slot": 1, "system": "NS_SnakeDual_PhantomSword_001", "mesh": "SM_FX_DoubleBlade_101"}]}
   ]
@@ -161,6 +165,7 @@ The window saves the same JSON, so you can start there and edit the file afterwa
 | `scabbard` | Use the skin's scabbard. |
 | `trails` | Attack tag pattern (the part after `Weapon.Trail.`, wildcards allowed) mapped to an effect name or path. |
 | `trail_color` | A color preset from `bladesmith/presets` for the weapon's own trails. |
+| `blade_color` | `to`: the new color as `#RRGGBB`. `from`: the hue to replace in degrees, by default the look's main color. Its usual shade becomes exactly `to`. |
 | `effect_meshes` | Copy an effect attached to a blade with another mesh inside, like the ghost blade of the Crimson Viper throw. |
 
 Each pak needs its own name. Two paks that change the same weapon conflict; paks for different weapons work together.
@@ -172,7 +177,9 @@ Each pak needs its own name. Two paks that change the same weapon conflict; paks
 Bladesmith converts the needed packages with retoc, edits them as JSON through UAssetGUI, and packs the result into
 an IoStore pak. A blade skin points the weapon's blueprint at another skeletal mesh; scabbards and trails are fields
 in the weapon's data asset. Trail colors live in material instances, in constants baked into the effect's scripts and
-in color curves, so a preset patches all three in copies of the effect.
+in color curves, so a preset patches all three in copies of the effect. A blade color edits the compressed texture
+blocks directly (DXT1/DXT5 endpoints, no re-encoding) in a copy of the texture, points a copy of the material at it,
+and sets that material on the weapon's blueprint.
 
 The examples rebuild the [Sanguine Skins](https://www.nexusmods.com/phantombladezero/mods/399) mod, and every file
 matches the hand-made version that was tested in the game byte for byte. `python dev/parity.py` compares a build with
