@@ -50,7 +50,7 @@ def run(*args: str) -> str:
 
 def main(version: str) -> Path:
     cfg = config.load()
-    mappings = Path(os.environ["LOCALAPPDATA"]) / "UAssetGUI" / "Mappings" / f"{cfg.mappings}.usmap"
+    mappings = config.find_mappings(cfg.mappings, cfg.uassetgui)
     for f in (cfg.retoc, cfg.uassetgui, mappings):
         if not f.exists():
             raise SystemExit(f"missing: {f}")
@@ -66,7 +66,9 @@ def main(version: str) -> Path:
 
     app = BUILD / "dist" / "Bladesmith"
     tools = app / "tools"
-    (tools / "Data" / "Mappings").mkdir(parents=True)  # UAssetGUI portable mode: mappings next to the exe
+    (tools / "Data" / "Mappings").mkdir(parents=True)
+    # without this file UAssetGUI ignores Data\Mappings and the game assets come out unparsed on every other PC
+    (tools / "Data" / "config.json").write_text(config.PORTABLE_CONFIG, encoding="utf-8")
     shutil.copy2(cfg.retoc, tools / "retoc.exe")
     shutil.copy2(cfg.uassetgui, tools / "UAssetGUI.exe")
     shutil.copy2(mappings, tools / "Data" / "Mappings" / "PBZ.usmap")

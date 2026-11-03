@@ -115,9 +115,16 @@ class Game:
     def json_of(self, package: str, mapped: bool = True) -> dict:
         tag = "m" if mapped else "raw"
         js = self.json_dir / (self.rel(package) + f".{tag}.json")
-        if not js.exists():
-            tools.to_json(self.cfg, self.legacy_file(package), js, mapped)
-        return json.loads(js.read_text(encoding="utf-8-sig"))
+        for attempt in range(2):
+            if not js.exists():
+                tools.to_json(self.cfg, self.legacy_file(package), js, mapped)
+            data = json.loads(js.read_text(encoding="utf-8-sig"))
+            # UAssetGUI falls back to unparsed exports when it can't use the mappings; versions up to 0.3.1 cached
+            # such files on every PC but the developer's, so a cached one is converted again before giving up
+            if not mapped or not any("RawExport" in str(e.get("$type", "")) for e in data.get("Exports", [])):
+                return data
+            js.unlink()
+        raise tools.ToolError(f"UAssetGUI couldn't read {package.rsplit('/', 1)[-1]} with the game mappings ({self.cfg.mappings})")
 
     def prefetch(self, packages: list[str], mapped: bool = True) -> None:
         """Extract in one retoc run, then convert to JSON. Conversions stay sequential: parallel UAssetGUI runs

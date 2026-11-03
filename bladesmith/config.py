@@ -83,6 +83,25 @@ def config_file(path: str | os.PathLike | None = None) -> Path | None:
     return None
 
 
+PORTABLE_CONFIG = '{"Note": "UAssetGUI portable mode for Bladesmith"}\n'  # UAssetGUI checks for its own name in it
+
+
+def find_mappings(name: str, uassetgui: Path) -> Path:
+    """The .usmap that UAssetGUI will load for `name`, or a clear error. UAssetGUI's command line only takes mappings
+    by name (a file path is silently ignored, and the asset comes out unparsed) and looks for them in Data\\Mappings
+    next to the exe when Data\\config.json mentions "UAssetGUI" (portable mode), else in %LOCALAPPDATA%\\UAssetGUI."""
+    data = uassetgui.parent / "Data"
+    try:
+        portable = "UAssetGUI" in (data / "config.json").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        portable = False
+    folder = data if portable else Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "UAssetGUI"
+    usmap = folder / "Mappings" / f"{name}.usmap"
+    if not usmap.is_file():
+        raise ConfigError("tool", f"Game mappings missing: {usmap}. Unpack the whole Bladesmith archive, tools folder included.")
+    return usmap
+
+
 def load(path: str | os.PathLike | None = None) -> Config:
     f = config_file(path)
     raw = tomllib.loads(f.read_text(encoding="utf-8")) if f else {}
@@ -109,6 +128,7 @@ def load(path: str | os.PathLike | None = None) -> Config:
     for tool in (cfg.retoc, cfg.uassetgui):
         if not tool.exists():
             raise ConfigError("tool", f"Helper tool missing: {tool}. Unpack the whole Bladesmith archive, tools folder included.")
+    find_mappings(cfg.mappings, cfg.uassetgui)
     if not dotnet_desktop_8():
         raise ConfigError("dotnet", "UAssetGUI needs the .NET 8 Desktop Runtime (x64). Install it, then start Bladesmith again.")
     return cfg

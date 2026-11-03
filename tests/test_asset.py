@@ -99,6 +99,48 @@ class SafetyTests(unittest.TestCase):
             apply_patches(f, [BytePatch("lut", b"BBBB", b"CCCC")])
 
 
+class MappingsTests(unittest.TestCase):
+    """Up to 0.3.1 Bladesmith passed the mappings by name, which UAssetGUI only finds in the developer's own
+    %LOCALAPPDATA%\\UAssetGUI; everyone else got unparsed assets."""
+
+    def test_bundled_mappings_need_portable_mode(self):
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+        from bladesmith import config
+        tools = Path(tempfile.mkdtemp())
+        exe, usmap = tools / "UAssetGUI.exe", tools / "Data" / "Mappings" / "PBZ.usmap"
+        usmap.parent.mkdir(parents=True)
+        usmap.write_bytes(b"usmap")
+        with mock.patch.dict("os.environ", {"LOCALAPPDATA": str(tools / "nobody")}):
+            with self.assertRaises(config.ConfigError):  # no config.json: UAssetGUI would not look in Data\Mappings
+                config.find_mappings("PBZ", exe)
+            (tools / "Data" / "config.json").write_text(config.PORTABLE_CONFIG)
+            self.assertEqual(config.find_mappings("PBZ", exe), usmap)
+
+    def test_cached_unparsed_json_is_converted_again(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+        from bladesmith import game, tools
+        g = game.Game.__new__(game.Game)
+        g.json_dir = Path(tempfile.mkdtemp())
+        g.cfg = mock.Mock(mappings="PBZ.usmap")
+        g.rel = lambda p: "Weapon"
+        g.legacy_file = lambda p: Path("Weapon.uasset")
+        cached = g.json_dir / "Weapon.m.json"
+        cached.write_text(json.dumps({"Exports": [{"$type": "UAssetAPI.ExportTypes.RawExport, UAssetAPI"}]}))
+        good = {"Exports": [{"$type": "UAssetAPI.ExportTypes.NormalExport, UAssetAPI", "Data": []}]}
+        with mock.patch.object(tools, "to_json", side_effect=lambda cfg, src, out, mapped: out.write_text(json.dumps(good))):
+            self.assertEqual(g.json_of("/Game/Weapon"), good)
+        cached.unlink()
+        raw = json.dumps({"Exports": [{"$type": "RawExport"}]})
+        with mock.patch.object(tools, "to_json", side_effect=lambda cfg, src, out, mapped: out.write_text(raw)):
+            with self.assertRaises(tools.ToolError):
+                g.json_of("/Game/Weapon")
+
+
 class ImageTableTests(unittest.TestCase):
     def test_unreadable_weapon_table_names_the_export(self):
         # a user's run got the weapon table without its rows (KeyError 'Table' on the loading screen)
