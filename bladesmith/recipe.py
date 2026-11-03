@@ -163,6 +163,10 @@ class Builder:
                 self.bulk[tex_dst] = bulk
                 m = recolor.material_copy(g, mi, mi_dst, {})[0]
                 m.repoint_import(tex_idx, tex_dst, tex_dst.rsplit("/", 1)[1])
+                # the blueprint imports <package>.<last path segment>: an object still named after the original
+                # isn't found, and the game silently keeps the mesh's own material
+                m.ensure_name(mi_dst.rsplit("/", 1)[1])
+                m.export(mi.rsplit("/", 1)[1])["ObjectName"] = mi_dst.rsplit("/", 1)[1]
                 self.edited[mi_dst] = (m, True)
             ops.set_blade_material(self._asset(base.slots[i].bp), mi_dst)
             self.log.append(f"  slot {i}: {tex.rsplit('/', 1)[1]} hue {hue:g} -> {spec['to']}")
