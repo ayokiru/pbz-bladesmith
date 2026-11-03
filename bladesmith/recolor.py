@@ -10,7 +10,9 @@ assets are never touched, so enemies using the same effects keep their colors.
 """
 from __future__ import annotations
 
+import colorsys
 import json
+import re
 import struct
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -151,5 +153,89 @@ def plan(game: Game, preset: dict, fx_folder: str) -> tuple[dict[str, str], list
         src = game.resolve(name)
         dst = f"{folder}/{name}"
         effects.append(effect_copy(game, src, dst, spec, mi_targets))
+        remap[src] = dst
+    return remap, effects, materials
+
+
+# --- automatic tint (experimental) ------------------------------------------------------------------
+# Hand-made presets know every color source of one effect. A tint works on any effect instead: it moves the
+# hue of every saturated color in the effect's color curves and in its material colors to one target hue,
+# keeping brightness and saturation, and leaves white, grey and black alone. Colors baked into script
+# constants are not touched, so some effects keep a part of their original color.
+TINTS = {"crimson": 355, "ember": 18, "gold": 44, "jade": 140, "azure": 212, "violet": 278}
+COLOR_PARAM = re.compile(r"colou?r|tint|emiss|glow|fresnel|edge|rim|weight", re.I)
+
+
+def tint_rgb(r: float, g: float, b: float, hue: float) -> tuple[float, float, float]:
+    """Same brightness and saturation, new hue; nearly grey colors stay as they are."""
+    top = max(r, g, b)
+    if top <= 0:
+        return r, g, b
+    h, s, v = colorsys.rgb_to_hsv(r / top, g / top, b / top)   # HDR values: normalise, then scale back
+    if s < 0.12:
+        return r, g, b
+    nr, ng, nb = colorsys.hsv_to_rgb(hue / 360, s, v)
+    return nr * top, ng * top, nb * top
+
+
+def tint_material(game: Game, mi_package: str, new_package: str, hue: float) -> Asset | None:
+    """Copy of a material instance with its colorful vector parameters tinted, or None if it has none."""
+    a = Asset(game.json_of(mi_package))
+    changed = False
+    for d in a.main_data():
+        if d.get("Name") != "VectorParameterValues":
+            continue
+        for el in d["Value"]:
+            f = {x["Name"]: x for x in el["Value"]}
+            pname = next(x["Value"] for x in f["ParameterInfo"]["Value"] if x["Name"] == "Name")
+            v = f["ParameterValue"]["Value"]
+            if not v or not COLOR_PARAM.search(str(pname)):
+                continue
+            c = v[0]["Value"]
+            rgb = tuple(_num(c[k]) for k in "RGB")
+            if max(rgb) > 50:   # not a color
+                continue
+            new = tint_rgb(*rgb, hue)
+            if new != rgb:
+                c.update({"R": new[0], "G": new[1], "B": new[2]})
+                changed = True
+    if not changed:
+        return None
+    a.rename(mi_package, new_package, None)
+    if a.j.get("FolderName") == mi_package:
+        a.j["FolderName"] = new_package
+    return a
+
+
+def tint_plan(game: Game, systems: list[str], tint: str, fx_folder: str) -> tuple[dict[str, str], list[RecoloredEffect], dict[str, Asset]]:
+    """Tinted copies of the given effects (and of the materials they render with)."""
+    if tint not in TINTS:
+        raise PresetError(f"unknown tint '{tint}' (available: {', '.join(TINTS)})")
+    hue = TINTS[tint]
+    folder = f"{fx_folder.rstrip('/')}/{tint}"
+    remap, effects, materials, mi_targets = {}, [], {}, {}
+    game.prefetch(systems)
+    for src in systems:
+        raw = Asset(game.json_of(src, mapped=False))
+        for i in raw.find_imports("MaterialInstanceConstant"):
+            mi = raw.package_of(i)
+            if mi in mi_targets or not game.has(mi):
+                continue
+            dst = f"{folder}/MI/{mi.rsplit('/', 1)[1]}"
+            copy = tint_material(game, game.canon(mi), dst, hue)
+            if copy is not None:
+                materials[dst], mi_targets[mi] = copy, dst
+        dst = f"{folder}/{src.rsplit('/', 1)[1]}"
+        eff = effect_copy(game, src, dst, {}, mi_targets)
+        mapped = game.json_of(src)
+        for e in mapped["Exports"]:
+            if str(e.get("ObjectName", "")).startswith("NiagaraDataInterfaceColorCurve"):
+                lut = [_num(x["Value"]) for x in prop(e["Data"], "ShaderLUT")["Value"]]
+                new = []
+                for k in range(0, len(lut) - 3, 4):
+                    new += [*tint_rgb(*lut[k:k + 3], hue), lut[k + 3]]
+                if new != lut:
+                    eff.patches.append(BytePatch(f"{e['ObjectName']} LUT", _floats(*lut), _floats(*new)))
+        effects.append(eff)
         remap[src] = dst
     return remap, effects, materials

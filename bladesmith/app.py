@@ -14,7 +14,7 @@ import webview
 from . import catalog, config, images, recipe
 from .config import Config, ConfigError
 from .game import Game
-from .recolor import PRESET_DIR
+from .recolor import PRESET_DIR, TINTS
 
 WEB = Path(__file__).with_name("web")
 INSTALLED = config.USER_DIR / "installed.json"
@@ -99,6 +99,7 @@ class Api:
                 "trails": [{"pkg": p, "name": short(p), **info} for p, info in lib.items()],
                 "presets": [{"id": p["id"], "description": p.get("description", ""),
                              "systems": [s.lower() for s in p["systems"]]} for p in presets],
+                "tints": [{"id": k, "hue": h} for k, h in TINTS.items()],
             }
 
     def choose_game_folder(self) -> dict:

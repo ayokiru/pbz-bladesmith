@@ -106,24 +106,6 @@ function renderSkins() {
 }
 
 // ---------- preview ----------
-function trailOptions(base, current) {
-  const sorted = [...S.data.trails].sort((a, b) => a.name.localeCompare(b.name));
-  const ok = base.fades ? sorted.filter((t) => t.fade) : sorted.filter((t) => t.blade);
-  const rest = sorted.filter((t) => !ok.includes(t));
-  const count = {};
-  for (const t of sorted) count[t.name] = (count[t.name] || 0) + 1;
-  const opt = (t) => {
-    const marks = [t.fade && "fade", t.blade && "blade", t.hero && "hero"].filter(Boolean).join(" ");
-    const where = count[t.name] > 1 ? `  (${t.pkg.split("/").slice(-2, -1)[0]})` : "";  // same name in two folders
-    return el("option", { value: t.pkg, selected: t.pkg === current }, `${t.name}${where}${marks ? "   [" + marks + "]" : ""}`);
-  };
-  return [
-    el("option", { value: ORIGINAL }, "original"),
-    el("optgroup", { label: base.fades ? "Fade-capable (no tail while running)" : "Blade trails (safest look)" }, ok.map(opt)),
-    el("optgroup", { label: base.fades ? "Others: will keep trailing the blade" : "Other effects" }, rest.map(opt)),
-  ];
-}
-
 function renderPreview() {
   const base = byKey(S.base);
   $("preview-empty").hidden = !!base;
@@ -152,29 +134,108 @@ function renderPreview() {
   if (!hasScab) scab.checked = false;
 
   const covered = S.data.presets.filter((p) => base.trails.some((t) => p.systems.includes(t.name.toLowerCase())));
-  $("color-opt").hidden = !covered.length;
-  $("color").replaceChildren(el("option", { value: "" }, "original"), ...covered.map((p) => el("option", { value: p.id }, p.id)));
+  $("color").replaceChildren(el("option", { value: "" }, "original"),
+    covered.length ? el("optgroup", { label: "Made for this weapon" }, covered.map((p) => el("option", { value: "preset:" + p.id }, p.id))) : null,
+    el("optgroup", { label: "Tint (experimental)" }, S.data.tints.map((t) => el("option", { value: "tint:" + t.id }, t.id))));
   $("color-hint").textContent = "";
+  S.trailChoice = {};
+  renderTrailRows();
+}
 
+// ---------- trail picker ----------
+const RECOMMENDED = {  // checked in the game
+  NS_JinYe_BloodTrail_101: "Blood ribbons",
+  NS_ChiYingGuRen_BladeTrail_002: "Crimson slash",
+  NS_BaiShan_BladeTrail_Red_102: "Red arc",
+};
+const KEYWORDS = {
+  blood: /blood|red|crimson|xue/i, fire: /fire|flame|burn|huo|yan_?r?u?|lava/i, lightning: /lightning|thunder|lei|electric/i,
+  ice: /ice|frost|snow|bing|frozen|cold/i, wind: /wind|feng|air/i, dark: /dark|black|shadow|hei|mo_|demon/i,
+};
+const PICK_FILTERS = [["fits", "Fits this weapon"], ["hero", "Hero trails"], ...Object.keys(KEYWORDS).map((k) => [k, k[0].toUpperCase() + k.slice(1)])];
+
+function pretty(name) {
+  if (RECOMMENDED[name]) return RECOMMENDED[name];
+  return name.replace(/^NS_/, "").replace(/([a-z])([A-Z])/g, "$1 $2").split("_").filter(Boolean)
+    .map((w, i) => (i === 0 ? w + " \u00B7" : w)).join(" ").replace(/\u00B7 \u00B7/, "\u00B7");
+}
+
+// Folder names carry boss names, so groups say only where an effect is safe to use.
+function groupOf(t) {
+  if (RECOMMENDED[t.name]) return "Recommended";
+  return t.player ? "Hero weapons" : "Everything else";
+}
+
+function trailByPkg(pkg) {
+  return S.data.trails.find((t) => t.pkg === pkg);
+}
+
+function renderTrailRows() {
+  const base = byKey(S.base);
   $("trails").replaceChildren(...base.trails.map((t) => {
-    const sel = el("select", { "data-tag": t.tag, onchange: (e) => e.target.classList.toggle("changed", !!e.target.value) }, trailOptions(base, ORIGINAL));
-    return el("div", { class: "trail" }, el("span", { class: "tagname" }, t.tag), sel, el("span", { class: "orig" }, "now: " + t.name));
+    const chosen = S.trailChoice[t.tag];
+    const info = chosen ? trailByPkg(chosen) : null;
+    const btn = el("button", { type: "button", class: `trail-btn${chosen ? " changed" : ""}`, onclick: () => openPicker(t.tag),
+      "aria-label": `Trail for ${t.tag}: ${chosen ? pretty(info ? info.name : chosen) : "original"}. Change` },
+      el("span", { class: "t" }, chosen ? pretty(info ? info.name : chosen.split("/").pop()) : "Original"),
+      el("span", { class: "s" }, chosen ? (info ? info.name : chosen) : "now: " + t.name));
+    return el("div", { class: "trail" }, el("span", { class: "tagname" }, t.tag), btn);
   }));
+}
+
+function openPicker(tag) {
+  S.pickTag = tag;
+  S.pickFilters = S.pickFilters || new Set(["fits"]);
+  S.lastFocus = document.activeElement;
+  $("picker-title").textContent = `Trail for ${tag}`;
+  $("picker-search").value = "";
+  $("picker").hidden = $("picker-shade").hidden = false;
+  renderPicker();
+  $("picker-search").focus();
+}
+
+function closePicker() {
+  $("picker").hidden = $("picker-shade").hidden = true;
+  if (S.lastFocus) S.lastFocus.focus();
+}
+
+function pickTrail(pkg) {
+  if (pkg) S.trailChoice[S.pickTag] = pkg;
+  else delete S.trailChoice[S.pickTag];
+  closePicker();
+  renderTrailRows();
+}
+
+function renderPicker() {
+  const base = byKey(S.base);
+  const q = $("picker-search").value.trim().toLowerCase();
+  const f = S.pickFilters;
+  $("picker-filters").replaceChildren(...PICK_FILTERS.map(([k, label]) =>
+    el("button", { type: "button", class: `chip${f.has(k) ? " on" : ""}`, "aria-pressed": String(f.has(k)),
+      onclick: () => { f.has(k) ? f.delete(k) : f.add(k); renderPicker(); } }, label)));
+  const current = S.trailChoice[S.pickTag] || "";
+  // only fade weapons have a hard requirement; other weapons can use any trail
+  const ok = (t) => (!f.has("fits") || !base.fades || t.fade) && (!f.has("hero") || t.player)
+    && Object.keys(KEYWORDS).every((k) => !f.has(k) || KEYWORDS[k].test(t.name))
+    && (!q || t.name.toLowerCase().includes(q) || pretty(t.name).toLowerCase().includes(q));
+  const item = (t) => el("button", { type: "button", class: `pk-item${t.pkg === current ? " current" : ""}`, onclick: () => pickTrail(t.pkg) },
+    el("span", {}, el("div", { class: "t" }, pretty(t.name)), el("div", { class: "s" }, t.name)),
+    el("span", { class: "marks" }, [t.fade && "fade", t.blade && "blade", t.player && "hero"].filter(Boolean).map((m) => el("i", { class: "pill " + m }, m))));
+  const list = S.data.trails.filter(ok);
+  const groups = {};
+  for (const t of list) (groups[groupOf(t)] ||= []).push(t);
+  const names = ["Recommended", "Hero weapons", "Everything else"].filter((g) => groups[g]);
+  const orig = byKey(S.base).trails.find((t) => t.tag === S.pickTag);
+  const out = [el("button", { type: "button", class: `pk-item${current ? "" : " current"}`, onclick: () => pickTrail(null) },
+    el("span", {}, el("div", { class: "t" }, "Original"), el("div", { class: "s" }, orig ? orig.name : "")), el("span"))];
+  for (const g of names) out.push(el("div", { class: "pk-group" }, `${g} (${groups[g].length})`), ...groups[g].map(item));
+  if (!list.length) out.push(el("div", { class: "muted" }, "Nothing matches. Turn a filter off or change the search."));
+  $("picker-list").replaceChildren(...out);
 }
 
 function updateAddLabel() {
   const inRecipe = S.base && S.recipe.some((r) => r.base === S.base);
   $("btn-add").textContent = inRecipe ? "Update recipe" : "Add to recipe";
-}
-
-// Narrow the long effect lists: every select keeps its current value plus the effects whose name matches.
-function filterTrails() {
-  const q = $("trail-filter").value.trim().toLowerCase();
-  for (const sel of document.querySelectorAll("#trails select")) {
-    for (const opt of sel.querySelectorAll("option")) {
-      opt.hidden = !!q && opt.value !== "" && opt.value !== sel.value && !opt.textContent.toLowerCase().includes(q);
-    }
-  }
 }
 
 function selectBase(key) {
@@ -188,7 +249,6 @@ function selectBase(key) {
   renderPreview();
   const existing = S.recipe.find((r) => r.base === key);
   if (existing) loadEntry(existing);
-  $("trail-filter").value = "";
   updateAddLabel();
   renderRecipe();
 }
@@ -205,11 +265,9 @@ function loadEntry(e) {
   renderSkins();
   renderPreview();
   $("scabbard").checked = !!e.scabbard;
-  $("color").value = e.trail_color || "";
-  for (const s of document.querySelectorAll("#trails select")) {
-    s.value = (e.trails || {})[s.dataset.tag] || ORIGINAL;
-    s.classList.toggle("changed", !!s.value);
-  }
+  $("color").value = e.trail_color ? "preset:" + e.trail_color : e.trail_tint ? "tint:" + e.trail_tint : "";
+  S.trailChoice = { ...(e.trails || {}) };
+  renderTrailRows();
 }
 
 // ---------- recipe ----------
@@ -222,10 +280,10 @@ function currentEntry() {
     if (skin.blades !== base.blades) e.slots = [...Array(Math.min(skin.blades, base.blades)).keys()];
     if ($("scabbard").checked && skin.scabbard) e.scabbard = true;
   }
-  const trails = {};
-  for (const s of document.querySelectorAll("#trails select")) if (s.value) trails[s.dataset.tag] = s.value;
-  if (Object.keys(trails).length) e.trails = trails;
-  if ($("color").value) e.trail_color = $("color").value;
+  if (Object.keys(S.trailChoice).length) e.trails = { ...S.trailChoice };
+  const [kind, id] = $("color").value.split(":");
+  if (kind === "preset") e.trail_color = id;
+  if (kind === "tint") e.trail_tint = id;
   return e;
 }
 
@@ -234,6 +292,7 @@ function describe(e) {
   if (e.scabbard) bits.push("scabbard");
   if (e.trails) bits.push(`${Object.keys(e.trails).length} trail${Object.keys(e.trails).length > 1 ? "s" : ""}`);
   if (e.trail_color) bits.push(e.trail_color);
+  if (e.trail_tint) bits.push(e.trail_tint + " tint");
   return bits.join(" · ") || "look only";
 }
 
@@ -339,7 +398,7 @@ async function renderInstalled() {
   $("installed-list").replaceChildren(...list.map((p) => {
     const lines = (p.recipe.weapons || []).map((e) => {
       const b = byKey(e.base), s = e.skin ? byKey(e.skin) : null;
-      return el("li", {}, `${b ? b.name : e.base}${s ? " as " + s.name : ""}${e.trail_color ? " \u00B7 " + e.trail_color : ""}`);
+      return el("li", {}, `${b ? b.name : e.base}${s ? " as " + s.name : ""}${e.trail_color ? " \u00B7 " + e.trail_color : ""}${e.trail_tint ? " \u00B7 " + e.trail_tint + " tint" : ""}`);
     });
     const remove = el("button", { class: "ghost" }, "Remove");
     remove.addEventListener("click", async () => {
@@ -382,9 +441,16 @@ async function boot() {
   $("base-search").addEventListener("input", (e) => { S.query = e.target.value; renderBases(); });
   $("any-type").addEventListener("change", () => S.base && renderSkins());
   $("color").addEventListener("change", (e) => {
-    const p = S.data.presets.find((x) => x.id === e.target.value);
-    $("color-hint").textContent = p ? p.description : "";
+    const [kind, id] = e.target.value.split(":");
+    const p = kind === "preset" && S.data.presets.find((x) => x.id === id);
+    $("color-hint").textContent = p ? p.description : kind === "tint"
+      ? `Experimental: every colored part of this weapon's trails turns ${id}. A few effects keep part of their old color, which only shows in the game.` : "";
   });
+  $("picker-close").replaceChildren(icon("x"));
+  $("picker-close").addEventListener("click", closePicker);
+  $("picker-shade").addEventListener("click", closePicker);
+  $("picker-search").addEventListener("input", renderPicker);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("picker").hidden) closePicker(); });
   $("btn-add").addEventListener("click", addToRecipe);
   $("btn-installed").addEventListener("click", openDrawer);
   $("drawer-close").replaceChildren(icon("x"));
@@ -392,7 +458,6 @@ async function boot() {
   $("drawer-shade").addEventListener("click", closeDrawer);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("drawer").hidden) closeDrawer(); });
   refreshInstalledCount();
-  $("trail-filter").addEventListener("input", filterTrails);
   $("btn-build").addEventListener("click", () => build(false));
   $("btn-install").addEventListener("click", () => build(true));
   $("btn-save").addEventListener("click", () => window.pywebview.api.save_recipe(recipe()));

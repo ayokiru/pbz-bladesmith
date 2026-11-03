@@ -76,7 +76,6 @@
       <div class="opt">
         <label>Trails per attack</label>
         <div class="legend"><i class="pill fade">fade</i> ends cleanly on fade weapons <i class="pill blade">blade</i> built like the hero's trails <i class="pill hero">hero</i> used by a player weapon</div>
-        <input class="search wide" id="trail-filter" placeholder="Filter effects by name" spellcheck="false" aria-label="Filter trail effects by name">
         <div id="trails"></div>
       </div>
       <div class="add-bar"><button class="primary wide" id="btn-add">Add to recipe</button></div>
@@ -101,6 +100,16 @@
   <p class="muted">Paks Bladesmith put into your ~mods folder. Remove one to go back to the original weapons.</p>
   <div id="installed-list"></div>
 </aside>
+<div id="picker-shade" hidden></div>
+<div id="picker" role="dialog" aria-modal="true" aria-labelledby="picker-title" hidden>
+  <div class="drawer-head">
+    <h2 id="picker-title">Choose a trail</h2>
+    <button class="ghost icon-btn" id="picker-close" aria-label="Close"></button>
+  </div>
+  <input class="search wide" id="picker-search" placeholder="Search effects" spellcheck="false" aria-label="Search effects">
+  <div class="filters" id="picker-filters"></div>
+  <div id="picker-list"></div>
+</div>
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="app.js"></script>
 </body>

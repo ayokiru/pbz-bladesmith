@@ -43,5 +43,15 @@ class PakNameTests(unittest.TestCase):
                 pak_name({"pak_name": bad})
 
 
+class TintTests(unittest.TestCase):
+    def test_tint_keeps_greys_and_brightness(self):
+        import colorsys
+        from bladesmith.recolor import tint_rgb
+        self.assertEqual(tint_rgb(0.5, 0.5, 0.5, 212), (0.5, 0.5, 0.5))      # grey stays grey
+        r, g, b = tint_rgb(4.0, 0.2, 0.1, 212)                               # HDR red -> azure
+        self.assertAlmostEqual(max(r, g, b), 4.0, places=5)                  # brightness kept
+        self.assertAlmostEqual(colorsys.rgb_to_hsv(r / 4, g / 4, b / 4)[0] * 360, 212, delta=1)
+
+
 if __name__ == "__main__":
     unittest.main()

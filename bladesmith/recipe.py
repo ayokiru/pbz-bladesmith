@@ -22,7 +22,7 @@ import shutil
 from pathlib import Path
 
 from . import ops, recolor, tools
-from .asset import Asset
+from .asset import Asset, prop
 from .catalog import load_weapon
 from .game import Game
 
@@ -84,6 +84,23 @@ class Builder:
             remap, effects, materials = recolor.plan(g, preset, self.fx_folder)
             for line in ops.retarget_trails(self._asset(base.package), remap, g.canon):
                 self.log.append(f"  {line} ({preset['id']})")
+            for e in effects:
+                self.edited[e.target] = (e.asset, False)
+                self.patches[e.target] = e.patches
+            for pkg, a in materials.items():
+                self.edited[pkg] = (a, True)
+        if w.get("trail_tint"):
+            data = self._asset(base.package)
+            systems = []
+            for key, val in prop(data.main_data(), "Trails")["Value"]:
+                if key["Value"][0]["Value"].startswith("Weapon.Trail.Kick"):
+                    continue
+                idx = next(x for x in val["Value"] if x["Name"].startswith("Particle_")).get("Value")
+                if isinstance(idx, int) and idx < 0 and g.has(data.package_of(idx)):
+                    systems.append(g.canon(data.package_of(idx)))
+            remap, effects, materials = recolor.tint_plan(g, sorted(set(systems)), w["trail_tint"], self.fx_folder)
+            for line in ops.retarget_trails(data, remap, g.canon):
+                self.log.append(f"  {line} (tint {w['trail_tint']})")
             for e in effects:
                 self.edited[e.target] = (e.asset, False)
                 self.patches[e.target] = e.patches
