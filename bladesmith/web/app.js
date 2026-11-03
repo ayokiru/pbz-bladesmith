@@ -93,7 +93,7 @@ function renderSkins() {
   $("any-type").closest(".toggle").hidden = !base.skinnable;
   if (!base.skinnable) {
     $("skin-grid").replaceChildren(el("div", { class: "locked" },
-      `${base.name} keeps its blade in a different kind of asset, so it can't wear another look yet. Its trails and their colors can still be changed on the right.`));
+      `${base.name} keeps its blade in a different kind of asset, so it can't wear another look yet. You can still change its trails and their color on the right.`));
     return;
   }
   const any = $("any-type").checked;
@@ -124,7 +124,7 @@ function renderPreview() {
   if (skin && skin.blades !== base.blades)
     notes.push(el("div", { class: "warn" }, icon("warn"), ` ${base.name} has ${base.blades} blade(s), ${skin.name} has ${skin.blades}. Only matching slots change.`));
   if (base.fades)
-    notes.push(el("div", {}, `${base.name} ends its trails with a fade. Pick effects marked fade, others keep following the blade while you run.`));
+    notes.push(el("div", {}, `${base.name} ends its trails with a fade. Pick effects marked fade: the others keep following the blade while you run.`));
   notes.push(el("div", {}, "Stats, perks, moveset and hitboxes always stay with the base weapon."));
   $("pv-notes").replaceChildren(...notes);
 
@@ -183,19 +183,27 @@ function renderTrailRows() {
   }));
 }
 
+// While a dialog is open the page behind it can't take focus or clicks.
+function setBackdrop(on) {
+  for (const n of document.querySelectorAll("header, main, footer")) n.inert = on;
+}
+
 function openPicker(tag) {
   S.pickTag = tag;
-  S.pickFilters = S.pickFilters || new Set(["fits"]);
+  S.pickFilters = S.pickFilters || new Set();
+  if (byKey(S.base).fades) S.pickFilters.add("fits");
   S.lastFocus = document.activeElement;
   $("picker-title").textContent = `Trail for ${tag}`;
   $("picker-search").value = "";
   $("picker").hidden = $("picker-shade").hidden = false;
+  setBackdrop(true);
   renderPicker();
   $("picker-search").focus();
 }
 
 function closePicker() {
   $("picker").hidden = $("picker-shade").hidden = true;
+  setBackdrop(false);
   if (S.lastFocus) S.lastFocus.focus();
 }
 
@@ -210,7 +218,8 @@ function renderPicker() {
   const base = byKey(S.base);
   const q = $("picker-search").value.trim().toLowerCase();
   const f = S.pickFilters;
-  $("picker-filters").replaceChildren(...PICK_FILTERS.map(([k, label]) =>
+  if (!base.fades) f.delete("fits");  // any trail works on a weapon without fading trails
+  $("picker-filters").replaceChildren(...PICK_FILTERS.filter(([k]) => k !== "fits" || base.fades).map(([k, label]) =>
     el("button", { type: "button", class: `chip${f.has(k) ? " on" : ""}`, "aria-pressed": String(f.has(k)),
       onclick: () => { f.has(k) ? f.delete(k) : f.add(k); renderPicker(); } }, label)));
   const current = S.trailChoice[S.pickTag] || "";
@@ -380,12 +389,14 @@ async function refreshInstalledCount() {
 async function openDrawer() {
   S.lastFocus = document.activeElement;
   $("drawer").hidden = $("drawer-shade").hidden = false;
+  setBackdrop(true);
   await renderInstalled();
   $("drawer-close").focus();
 }
 
 function closeDrawer() {
   $("drawer").hidden = $("drawer-shade").hidden = true;
+  setBackdrop(false);
   if (S.lastFocus) S.lastFocus.focus();
 }
 
@@ -444,7 +455,7 @@ async function boot() {
     const [kind, id] = e.target.value.split(":");
     const p = kind === "preset" && S.data.presets.find((x) => x.id === id);
     $("color-hint").textContent = p ? p.description : kind === "tint"
-      ? `Experimental: every colored part of this weapon's trails turns ${id}. A few effects keep part of their old color, which only shows in the game.` : "";
+      ? `Experimental. Every colored part of this weapon's trails turns ${id}. Some effects keep a bit of their old color, and you'll only see that in the game.` : "";
   });
   $("picker-close").replaceChildren(icon("x"));
   $("picker-close").addEventListener("click", closePicker);

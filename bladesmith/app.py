@@ -153,7 +153,7 @@ class Api:
         with self._lock:
             reg = self._registry()
             if name not in reg or not recipe.PAK_NAME.match(name):  # only paks this program installed
-                return {"ok": False, "error": f"{name} was not installed by Bladesmith."}
+                return {"ok": False, "error": f"Bladesmith didn't install {name}, so it won't remove it."}
             try:
                 for ext in PAK_EXT:
                     (self._cfg.mods_dir / (name + ext)).unlink(missing_ok=True)

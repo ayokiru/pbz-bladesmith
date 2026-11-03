@@ -97,7 +97,7 @@ def load(path: str | os.PathLike | None = None) -> Config:
 
     game = path_of("game_dir", None) or find_game()
     if not is_game_dir(game):
-        raise ConfigError("game", "Phantom Blade Zero was not found. Pick the game folder (the one that contains ProjectPBZ).")
+        raise ConfigError("game", "Bladesmith couldn't find Phantom Blade Zero. Pick the game folder, the one that contains ProjectPBZ.")
     cfg = Config(
         game_dir=game,
         aes_key=raw.get("aes_key", PBZ_AES),
