@@ -39,12 +39,20 @@ class Weapon:
     package: str
     slots: list[Slot] = field(default_factory=list)
     trails: list[Trail] = field(default_factory=list)
+    hands: str = ""  # the game's Weapon.Type.Global tag: SingleHanded, TwoHanded or DualHanded
 
     @property
     def kind(self) -> str:
         s = " ".join(x.unarmed_socket for x in self.slots)
         if "Chakram" in s:
             return "chakram"
+        # the game's own tag first: the Fanatic's swords are one-handed but carried on the back like a greatsword
+        if self.hands == "TwoHanded":
+            return "two-handed"
+        if self.hands == "DualHanded":
+            return "dual"
+        if self.hands == "SingleHanded":
+            return "one-handed" + ("+offhand" if len(self.slots) > 1 else "")
         if len(self.slots) == 2 and "DoubleBlade" in s and "TangBlade" not in s:
             return "dual"
         if "LongBlade" in s:
@@ -79,6 +87,8 @@ def _parse(game: Game, key: str) -> Weapon:
     a = Asset(game.json_of(pkg))
     data = a.main_data()
     w = Weapon(key, pkg)
+    hands = re.search(r'"Weapon\.Type\.Global\.([A-Za-z]+)"', json.dumps(prop_value(data, "Weapon Equip Tags", [])))
+    w.hands = hands.group(1) if hands else ""
     for s in prop_value(data, "Display Data", []):
         v = {x["Name"]: x.get("Value") for x in s["Value"]}
         cls, sc = v.get("WeaponClass"), v.get("ScabbardMesh")
@@ -131,7 +141,7 @@ def save(weapons: list[Weapon], path: Path) -> None:
 def load(path: Path) -> list[Weapon]:
     out = []
     for d in json.loads(Path(path).read_text(encoding="utf-8")):
-        w = Weapon(d["key"], d["package"])
+        w = Weapon(d["key"], d["package"], hands=d.get("hands", ""))
         w.slots = [Slot(**s) for s in d["slots"]]
         w.trails = [Trail(**t) for t in d["trails"]]
         out.append(w)
@@ -160,7 +170,11 @@ def cached(game: Game) -> list[Weapon]:
             p.write_text(json.dumps(pre, ensure_ascii=False), encoding="utf-8")
         else:
             save(build(game), p)
-    return load(p)
+    weapons = load(p)
+    if not any(w.hands for w in weapons):  # cached by a version that didn't read the game's hand tags
+        save(build(game), p)
+        weapons = load(p)
+    return weapons
 
 
 TRAIL_NAME = re.compile(r"trail", re.I)
