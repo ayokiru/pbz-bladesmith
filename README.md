@@ -34,6 +34,9 @@ ships with Bladesmith, and after a game patch you rebuild your pak from the upda
 - Changes one color of a blade (experimental). Pick one of the look's colors, for example Sanguine's red, and what it
   becomes. Only that weapon changes, because it gets its own copy of the texture. Hilt, blade and scabbard use one
   texture, so every part painted in that color changes together. Plain steel and wood have no color to pick.
+- Notices when a game update changes files a pak was built from. Bladesmith remembers which game files went into
+  each pak it installs; after an update the Installed list names the ones that changed, and Rebuild makes the pak
+  again from the same recipe.
 - Shows the game's own inventory render on every weapon card and a before/after preview of the weapon you are editing.
 - Warns before you build. Some weapons end their trails with a fade (Outlaw Warblade and eight others), and a trail
   without fade support keeps following the blade while you run, so the trail list marks the ones that fade. Skins from

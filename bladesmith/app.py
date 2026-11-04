@@ -149,7 +149,7 @@ class Api:
                     return {"ok": False, "error": f"~mods already has a {name} that Bladesmith did not make. Pick another pak name."}
                 out = self._cfg.cache_dir.parent / "out" / name
                 self._log(f"Building {name}...")
-                utoc, log = recipe.run(self._game, r, self._cfg.cache_dir / "stage", out, allow_mismatch=True)
+                utoc, log, sources = recipe.run(self._game, r, self._cfg.cache_dir / "stage", out, allow_mismatch=True)
                 for line in log:
                     self._log(line)
                 if install:
@@ -157,7 +157,8 @@ class Api:
                     for ext in PAK_EXT:
                         shutil.copy2(utoc.with_suffix(ext), self._cfg.mods_dir / (name + ext))
                     reg = self._registry()
-                    reg[name] = {"recipe": dict(r, pak_name=name), "date": datetime.now().strftime("%Y-%m-%d %H:%M")}
+                    reg[name] = {"recipe": dict(r, pak_name=name), "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                                 "game": self._game.fingerprint(), "sources": sources}
                     self._save_registry(reg)
                     self._log(f"Installed into {self._cfg.mods_dir}")
                 return {"ok": True, "folder": str(out)}
@@ -179,12 +180,34 @@ class Api:
                 return {"ok": False, "error": str(e)}
 
     def installed(self) -> list[dict]:
-        """Paks this program installed that are still in ~mods (entries for paks deleted by hand are dropped)."""
-        reg = self._registry()
-        alive = {n: v for n, v in reg.items() if (self._cfg.mods_dir / (n + ".pak")).exists()}
-        if alive != reg:
-            self._save_registry(alive)
-        return [{"name": n, **v} for n, v in sorted(alive.items())]
+        """Paks this program installed that are still in ~mods (entries for paks deleted by hand are dropped).
+        After a game update each one also lists "stale": the game files it was built from that the update changed."""
+        with self._lock:
+            reg = self._registry()
+            alive = {n: v for n, v in reg.items() if (self._cfg.mods_dir / (n + ".pak")).exists()}
+            changed = alive != reg
+            out = []
+            for n, v in sorted(alive.items()):
+                stale = []
+                if v.get("sources") and v.get("game") != self._game.fingerprint():
+                    try:
+                        stale = recipe.sources_changed(self._game, v["sources"])
+                    except Exception:
+                        self._file_log(f"checking {n} after a game update failed\n" + traceback.format_exc())
+                    else:
+                        if not stale:  # nothing it uses changed: remember that this game version is fine
+                            v["game"], changed = self._game.fingerprint(), True
+                out.append({"name": n, **{k: x for k, x in v.items() if k != "sources"}, "stale": [short(p) for p in stale]})
+            if changed:
+                self._save_registry(alive)
+            return out
+
+    def rebuild(self, name: str) -> dict:
+        """Build an installed pak again from its own recipe, with the game as it is now."""
+        entry = self._registry().get(name)
+        if entry is None:
+            return {"ok": False, "error": f"Bladesmith didn't install {name}."}
+        return self.build(entry["recipe"], install=True)
 
     def uninstall(self, name: str) -> dict:
         with self._lock:

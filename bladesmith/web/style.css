@@ -218,3 +218,10 @@ footer h3 span { background: var(--accent); color: #fff; border-radius: 999px; p
 .swatch:focus-visible, #blade-color:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
 .blade-to { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
 #blade-color { width: 40px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; cursor: pointer; }
+
+/* installed paks the game update made stale */
+#btn-installed.stale { border-color: var(--gold); }
+#btn-installed.stale .count { background: var(--gold); color: #1c191d; }
+.stale-box { margin: 8px 0; padding: 10px 12px; border: 1px solid rgba(201, 164, 92, .45); border-radius: 8px; background: rgba(201, 164, 92, .08); }
+.stale-note { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; color: var(--text); margin-bottom: 8px; }
+.stale-note .icon { color: var(--gold); flex: none; margin-top: 2px; }

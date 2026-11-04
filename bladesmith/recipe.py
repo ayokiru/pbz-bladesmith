@@ -207,17 +207,29 @@ def pak_name(recipe: dict) -> str:
     return name if name.endswith("_P") else name + "_P"
 
 
-def run(game: Game, recipe: dict, stage: Path, out_dir: Path, allow_mismatch: bool = False) -> tuple[Path, list[str]]:
+def run(game: Game, recipe: dict, stage: Path, out_dir: Path,
+        allow_mismatch: bool = False) -> tuple[Path, list[str], dict[str, str]]:
+    """Build the pak. Returns it, the build log, and the game packages it was made from with their hashes, so a
+    game update that changes one of them can be noticed later (see sources_changed)."""
     name = pak_name(recipe)
     if not recipe.get("weapons"):
         raise ops.RecipeError("the recipe has no weapons")
+    game.read.clear()
     b = Builder(game, recipe, stage, allow_mismatch)
     for w in recipe["weapons"]:
         b.weapon(w)
     b.write()
     utoc = out_dir / (name + ".utoc")
     tools.pack(game.cfg, stage, utoc)
-    return utoc, b.log
+    sources = {p: game.source_hash(p) for p in sorted(p for p in game.read if p)}
+    return utoc, b.log, sources
+
+
+def sources_changed(game: Game, sources: dict[str, str]) -> list[str]:
+    """The packages a pak was built from that the game has changed or removed since."""
+    present = [p for p in sources if game.has(p)]
+    game.ensure(present)  # one extraction run for all of them
+    return sorted([p for p in sources if not game.has(p)] + [p for p in present if game.source_hash(p) != sources[p]])
 
 
 def load(path: Path) -> dict:

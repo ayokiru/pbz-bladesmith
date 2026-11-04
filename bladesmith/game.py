@@ -56,6 +56,7 @@ class Game:
             self.files = {mount_of(f): f[:-len(".uasset")] for f in files}
             idx.parent.mkdir(parents=True, exist_ok=True)
             idx.write_text(json.dumps(self.files), encoding="utf-8")
+        self.read: set[str] = set()  # packages read since it was last cleared: what a build is made from
         self._by_name: dict[str, list[str]] = {}
         self._lower: dict[str, str] = {}
         for m in self.files:
@@ -99,7 +100,17 @@ class Game:
     def rel(self, package: str) -> str:
         return self.files[self.canon(package)]
 
+    def source_hash(self, package: str) -> str:
+        """Content of a package as the game has it now: a pak built from it is out of date when this changes."""
+        f = self.legacy_file(package)
+        h = hashlib.sha1()
+        for ext in (".uasset", ".uexp", ".ubulk"):
+            if f.with_suffix(ext).exists():
+                h.update(f.with_suffix(ext).read_bytes())
+        return h.hexdigest()[:16]
+
     def legacy_file(self, package: str) -> Path:
+        self.read.add(self.canon(package))
         f = self.legacy / (self.rel(package) + ".uasset")
         if not f.exists():
             tools.extract(self.cfg, [self.rel(package).split("/", 1)[1] + "."], self.legacy)
@@ -113,6 +124,7 @@ class Game:
             tools.extract(self.cfg, [r.split("/", 1)[1] + "." for r in missing], self.legacy)
 
     def json_of(self, package: str, mapped: bool = True) -> dict:
+        self.read.add(self.canon(package))  # a cached JSON skips legacy_file, so record it here too
         tag = "m" if mapped else "raw"
         js = self.json_dir / (self.rel(package) + f".{tag}.json")
         for attempt in range(2):

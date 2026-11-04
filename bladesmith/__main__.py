@@ -29,7 +29,7 @@ def cmd_build(cfg, args) -> None:
     g = Game(cfg)
     r = recipe.load(args.recipe)
     out = Path(args.out)
-    utoc, log = recipe.run(g, r, cfg.cache_dir / "stage", out, allow_mismatch=args.allow_mismatch)
+    utoc, log, _ = recipe.run(g, r, cfg.cache_dir / "stage", out, allow_mismatch=args.allow_mismatch)
     print("\n".join(log))
     print(f"\nbuilt {utoc.with_suffix('.pak').name}, {utoc.name}, {utoc.with_suffix('.ucas').name} in {out}")
     if args.install:

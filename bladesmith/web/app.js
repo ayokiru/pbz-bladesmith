@@ -432,6 +432,13 @@ function showSetup(setup) {
 async function refreshInstalledCount() {
   S.installed = await window.pywebview.api.installed();
   $("installed-count").textContent = S.installed.length;
+  const stale = S.installed.filter((p) => p.stale && p.stale.length);
+  $("btn-installed").classList.toggle("stale", stale.length > 0);
+  $("btn-installed").title = stale.length ? "The game updated: rebuild these paks" : "";
+  if (stale.length && !S.staleShown) {  // once per start, not on every refresh
+    S.staleShown = true;
+    toast(`The game updated files ${stale.length === 1 ? stale[0].name + " is" : stale.length + " of your paks are"} built from. Open Installed to rebuild.`);
+  }
   return S.installed;
 }
 
@@ -473,6 +480,21 @@ async function renderInstalled() {
       if (res.ok) { toast(`${p.name} removed. The weapons are back to the original look.`); renderInstalled(); }
       else toast(res.error, true);
     });
+    const notes = [];
+    if (p.stale && p.stale.length) {
+      const rebuild = el("button", { class: "primary" }, "Rebuild");
+      rebuild.addEventListener("click", async () => {
+        rebuild.disabled = true;
+        rebuild.setAttribute("aria-busy", "true");
+        rebuild.textContent = "Rebuilding...";
+        const res = await window.pywebview.api.rebuild(p.name);
+        if (res.ok) { toast(`${p.name} rebuilt with the updated game files.`); renderInstalled(); }
+        else { toast(res.error, true); rebuild.disabled = false; rebuild.removeAttribute("aria-busy"); rebuild.textContent = "Rebuild"; }
+      });
+      notes.push(el("div", { class: "stale-note" }, icon("warn"),
+        el("span", {}, `The game update changed ${p.stale.length === 1 ? "a file" : p.stale.length + " files"} this pak was built from: ${p.stale.join(", ")}. Rebuild it to use the new versions.`)),
+        rebuild);
+    }
     const edit = el("button", { class: "ghost", onclick: () => {
       S.recipe = p.recipe.weapons || [];
       $("pak").value = p.name;
@@ -482,7 +504,7 @@ async function renderInstalled() {
     } }, "Edit");
     return el("div", { class: "inst" },
       el("div", { class: "top" }, el("span", { class: "name" }, p.name), el("span", { class: "date" }, p.date)),
-      el("ul", {}, lines), el("div", { class: "row" }, edit, remove));
+      el("ul", {}, lines), notes.length ? el("div", { class: "stale-box" }, notes) : null, el("div", { class: "row" }, edit, remove));
   }));
 }
 

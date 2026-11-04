@@ -126,6 +126,7 @@ class MappingsTests(unittest.TestCase):
         from bladesmith import game, tools
         g = game.Game.__new__(game.Game)
         g.json_dir = Path(tempfile.mkdtemp())
+        g.read, g.canon = set(), lambda p: p
         g.cfg = mock.Mock(mappings="PBZ.usmap")
         g.rel = lambda p: "Weapon"
         g.legacy_file = lambda p: Path("Weapon.uasset")
