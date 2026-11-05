@@ -36,14 +36,17 @@ def list_game_files(cfg: Config) -> list[str]:
     return files
 
 
-def extract(cfg: Config, filters: list[str], dest: Path) -> None:
-    """Convert matching game packages to legacy .uasset/.uexp files under dest."""
+def extract(cfg: Config, filters: list[str], dest: Path) -> str:
+    """Convert matching game packages to legacy .uasset/.uexp files under dest. Returns retoc's output:
+    it exits 0 even when a package fails to convert and only says why there."""
     dest.mkdir(parents=True, exist_ok=True)
+    out = []
     for i in range(0, len(filters), 40):  # one retoc run scans all containers, so batch the filters
         args = [cfg.retoc, "-a", cfg.aes_key, "to-legacy", "--no-shaders"]
         for f in filters[i:i + 40]:
             args += ["-f", f]
-        _run(args + [cfg.paks_dir, dest])
+        out.append(_run(args + [cfg.paks_dir, dest]))
+    return "\n".join(out)
 
 
 def pack(cfg: Config, stage: Path, utoc: Path) -> None:

@@ -112,10 +112,12 @@ class Game:
     def legacy_file(self, package: str) -> Path:
         self.read.add(self.canon(package))
         f = self.legacy / (self.rel(package) + ".uasset")
+        out = ""
         if not f.exists():
-            tools.extract(self.cfg, [self.rel(package).split("/", 1)[1] + "."], self.legacy)
+            out = tools.extract(self.cfg, [self.rel(package).split("/", 1)[1] + "."], self.legacy)
         if not f.exists():
-            raise tools.ToolError(f"could not extract {package}")
+            why = [ln.strip() for ln in out.splitlines() if "fail" in ln.lower() or "error" in ln.lower()]
+            raise tools.ToolError(f"could not extract {package}" + (": " + " | ".join(why)[-1000:] if why else ""))
         return f
 
     def ensure(self, packages: list[str]) -> None:

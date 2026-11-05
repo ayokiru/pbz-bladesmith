@@ -155,3 +155,21 @@ class ImageTableTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ExtractErrorTests(unittest.TestCase):
+    def test_retoc_reason_is_in_the_error(self):
+        # retoc exits 0 when a package fails to convert; the reason is only in its output
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+        from bladesmith import game, tools
+        g = game.Game.__new__(game.Game)
+        g.legacy, g.cfg = Path(tempfile.mkdtemp()), mock.Mock()
+        g.read, g.canon, g.rel = set(), lambda p: p, lambda p: "ProjectPBZ/Content/X/DT_WeaponData"
+        out = "info: Failed to convert ../../../ProjectPBZ/Content/X/DT_WeaponData.uasset: failed to fill whole buffer\n" \
+              "info: : Extracted 0 (1 failed) legacy assets"
+        with mock.patch.object(tools, "extract", return_value=out):
+            with self.assertRaises(tools.ToolError) as e:
+                g.legacy_file("/Game/X/DT_WeaponData")
+        self.assertIn("failed to fill whole buffer", str(e.exception))
