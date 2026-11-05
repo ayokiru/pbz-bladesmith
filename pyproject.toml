@@ -1,6 +1,6 @@
 [project]
 name = "bladesmith"
-version = "0.5.1"
+version = "0.5.2"
 description = "Weapon transmog builder for Phantom Blade Zero"
 requires-python = ">=3.11"
 license = {text = "MIT"}
