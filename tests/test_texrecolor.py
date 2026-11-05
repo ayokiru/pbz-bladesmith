@@ -55,3 +55,7 @@ class GrayLutTests(unittest.TestCase):
     def test_colors_turn_grey_at_their_brightest_channel_and_alpha_stays(self):
         from bladesmith.recolor import gray_lut
         self.assertEqual(gray_lut([0.004, 1.0, 0.5, 0.8, 1.0, 0.0, 0.0, 1.0]), [1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0, 1.0])
+
+    def test_level_zero_is_black(self):
+        from bladesmith.recolor import gray_lut
+        self.assertEqual(gray_lut([0.004, 1.0, 0.5, 0.8], 0), [0.0, 0.0, 0.0, 0.8])

@@ -45,15 +45,16 @@ def _num(v) -> float:
     return float(str(v).replace("+", ""))
 
 
-def spawn_literals(mapped: dict, emitter: str) -> bytes:
-    """Raw bytes of an emitter's spawn-script constants (read from the mapped JSON, which is fine for reading)."""
+def spawn_literals(mapped: dict, emitter: str, script: str = "SpawnScript") -> bytes:
+    """Raw bytes of an emitter script's constants (read from the mapped JSON, which is fine for reading).
+    script: SpawnScript, or UpdateScript for colors an emitter sets again every frame."""
     ex = mapped["Exports"]
     for e in ex:
-        if e.get("ObjectName") == "SpawnScript" and ex[e["OuterIndex"] - 1].get("ObjectName") == emitter:
+        if e.get("ObjectName") == script and ex[e["OuterIndex"] - 1].get("ObjectName") == emitter:
             vm = prop(e["Data"], "CachedScriptVM")["Value"]
             lits = next(x for x in vm if isinstance(x, dict) and x.get("Name") == "ScriptLiterals")["Value"]
             return bytes(int(x["Value"]) for x in lits)
-    raise PresetError(f"no spawn script for emitter '{emitter}'")
+    raise PresetError(f"no {script} for emitter '{emitter}'")
 
 
 def color_lut(mapped: dict) -> list[float]:
@@ -63,11 +64,11 @@ def color_lut(mapped: dict) -> list[float]:
     return [_num(x["Value"]) for x in prop(e["Data"], "ShaderLUT")["Value"]]
 
 
-def gray_lut(lut: list[float]) -> list[float]:
-    """RGBA table with every color made grey at its brightest channel; alpha kept."""
+def gray_lut(lut: list[float], level: float = 1.0) -> list[float]:
+    """RGBA table with every color made grey at its brightest channel times level; alpha kept."""
     out = []
     for k in range(0, len(lut) - 3, 4):
-        m = max(lut[k:k + 3])
+        m = max(lut[k:k + 3]) * level
         out += [m, m, m, lut[k + 3]]
     return out
 
@@ -125,9 +126,10 @@ def effect_copy(game: Game, source: str, target: str, spec: dict, mi_targets: di
             imp["ObjectName"] = mi_targets[imp["ObjectName"]]
     eff = RecoloredEffect(source, target, a)
     mapped = game.json_of(source)
-    if spec.get("lut_gray"):
+    if spec.get("lut_gray") is not None and spec.get("lut_gray") is not False:
         mine = color_lut(mapped)
-        eff.patches.append(BytePatch("ColorCurve LUT gray", _floats(*mine), _floats(*gray_lut(mine))))
+        level = 1.0 if spec["lut_gray"] is True else float(spec["lut_gray"])  # 0 = black: drops what the curve colors
+        eff.patches.append(BytePatch("ColorCurve LUT gray", _floats(*mine), _floats(*gray_lut(mine, level))))
     if "lut_from" in spec:
         donor = color_lut(game.json_of(game.resolve(spec["lut_from"])))
         mine = color_lut(mapped)
@@ -135,7 +137,7 @@ def effect_copy(game: Game, source: str, target: str, spec: dict, mi_targets: di
             raise PresetError("lut_from: tables differ in size")
         eff.patches.append(BytePatch("ColorCurve LUT", _floats(*mine), _floats(*donor)))
     for lit in spec.get("literals", []):
-        raw = spawn_literals(mapped, lit["emitter"])
+        raw = spawn_literals(mapped, lit["emitter"], lit.get("script", "SpawnScript"))
         s, vals = lit["start"], lit["values"]
         eff.patches.append(BytePatch(f"{lit['emitter']}[{s}:{s + len(vals)}]", raw[s * 4:(s + len(vals)) * 4], _floats(*vals)))
     return eff
