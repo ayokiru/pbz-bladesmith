@@ -1,7 +1,9 @@
 """Thin wrappers around retoc (IoStore <-> legacy) and UAssetGUI (uasset <-> JSON)."""
 from __future__ import annotations
 
+import hashlib
 import subprocess
+import urllib.request
 from pathlib import Path
 
 from .config import Config
@@ -25,6 +27,41 @@ def _run(args: list[str]) -> str:
     return r.stdout
 
 
+# retoc needs Oodle to read compressed game data. It downloads the DLL from GitHub on first use and, if that fails,
+# converts nothing and still exits 0 without saying why. So Bladesmith fetches it first, with mirrors that also
+# open where GitHub doesn't, and says what to do when none works. Not shipped in the zip: Oodle isn't ours to share.
+OODLE_DLL = "oo2core_9_win64.dll"
+OODLE_SHA256 = "6f5d41a7892ea6b2db420f2458dad2f84a63901c9a93ce9497337b16c195f457"
+_OODLE_PATH = "WorkingRobot/OodleUE/{}/Engine/Source/Programs/Shared/EpicGames.Oodle/Sdk/2.9.10/win/redist/" + OODLE_DLL
+OODLE_URLS = ["https://github.com/" + _OODLE_PATH.format("raw/refs/heads/main"),
+              "https://cdn.jsdelivr.net/gh/" + _OODLE_PATH.format("@main").replace("OodleUE/@", "OodleUE@"),
+              "https://fastly.jsdelivr.net/gh/" + _OODLE_PATH.format("@main").replace("OodleUE/@", "OodleUE@")]
+
+
+def ensure_oodle(cfg: Config) -> None:
+    dll = Path(cfg.retoc).with_name(OODLE_DLL)
+    if dll.exists() and hashlib.sha256(dll.read_bytes()).hexdigest() == OODLE_SHA256:
+        return
+    for url in OODLE_URLS:
+        try:
+            with urllib.request.urlopen(url, timeout=30) as r:
+                data = r.read()
+        except OSError:
+            continue
+        if hashlib.sha256(data).hexdigest() != OODLE_SHA256:
+            continue
+        try:
+            tmp = dll.with_suffix(".part")
+            tmp.write_bytes(data)
+            tmp.replace(dll)
+        except OSError as e:
+            raise ToolError(f"Couldn't write {dll} ({e}). Move the Bladesmith folder somewhere you can write to, "
+                            f"like Documents, and start it again.") from e
+        return
+    raise ToolError(f"Couldn't download {OODLE_DLL}, which retoc needs to read the game's compressed files. "
+                    f"Download it from {OODLE_URLS[1]} and put it into {dll.parent}, then try again.")
+
+
 def list_game_files(cfg: Config) -> list[str]:
     """All package paths in the game, as ProjectPBZ/... relative paths with extension."""
     out = _run([cfg.retoc, "-a", cfg.aes_key, "list", "--path", cfg.paks_dir])
@@ -39,6 +76,7 @@ def list_game_files(cfg: Config) -> list[str]:
 def extract(cfg: Config, filters: list[str], dest: Path) -> str:
     """Convert matching game packages to legacy .uasset/.uexp files under dest. Returns retoc's output:
     it exits 0 even when a package fails to convert and only says why there."""
+    ensure_oodle(cfg)
     dest.mkdir(parents=True, exist_ok=True)
     out = []
     for i in range(0, len(filters), 40):  # one retoc run scans all containers, so batch the filters
@@ -50,6 +88,7 @@ def extract(cfg: Config, filters: list[str], dest: Path) -> str:
 
 
 def pack(cfg: Config, stage: Path, utoc: Path) -> None:
+    ensure_oodle(cfg)
     utoc.parent.mkdir(parents=True, exist_ok=True)
     for ext in (".utoc", ".ucas", ".pak"):
         utoc.with_suffix(ext).unlink(missing_ok=True)
