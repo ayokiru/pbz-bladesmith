@@ -49,3 +49,9 @@ class RecolorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GrayLutTests(unittest.TestCase):
+    def test_colors_turn_grey_at_their_brightest_channel_and_alpha_stays(self):
+        from bladesmith.recolor import gray_lut
+        self.assertEqual(gray_lut([0.004, 1.0, 0.5, 0.8, 1.0, 0.0, 0.0, 1.0]), [1.0, 1.0, 1.0, 0.8, 1.0, 1.0, 1.0, 1.0])

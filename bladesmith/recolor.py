@@ -63,6 +63,15 @@ def color_lut(mapped: dict) -> list[float]:
     return [_num(x["Value"]) for x in prop(e["Data"], "ShaderLUT")["Value"]]
 
 
+def gray_lut(lut: list[float]) -> list[float]:
+    """RGBA table with every color made grey at its brightest channel; alpha kept."""
+    out = []
+    for k in range(0, len(lut) - 3, 4):
+        m = max(lut[k:k + 3])
+        out += [m, m, m, lut[k + 3]]
+    return out
+
+
 @dataclass
 class BytePatch:
     label: str
@@ -116,6 +125,9 @@ def effect_copy(game: Game, source: str, target: str, spec: dict, mi_targets: di
             imp["ObjectName"] = mi_targets[imp["ObjectName"]]
     eff = RecoloredEffect(source, target, a)
     mapped = game.json_of(source)
+    if spec.get("lut_gray"):
+        mine = color_lut(mapped)
+        eff.patches.append(BytePatch("ColorCurve LUT gray", _floats(*mine), _floats(*gray_lut(mine))))
     if "lut_from" in spec:
         donor = color_lut(game.json_of(game.resolve(spec["lut_from"])))
         mine = color_lut(mapped)
