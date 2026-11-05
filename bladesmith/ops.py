@@ -54,6 +54,9 @@ def set_scabbard(data_asset: Asset, slot: int, mesh_package: str, socket: str) -
         ss["Value"] = socket
 
 
+# a game effect with no emitters: trails set to "none" point here and draw nothing
+EMPTY_SYSTEM = "/PBZVFXPack/VFX/BattleFX/ZuoShang_LongTi/NS_ZuoShangLongTi_NoneWater_201"
+
 def set_trails(data_asset: Asset, mapping: dict[str, str], base: Weapon, game: Game) -> list[str]:
     """mapping: tag pattern (fnmatch, part after 'Weapon.Trail.') -> Niagara system name or package path."""
     report, used = [], set()
@@ -65,11 +68,15 @@ def set_trails(data_asset: Asset, mapping: dict[str, str], base: Weapon, game: G
             continue
         used.add(pat)
         target = mapping[pat]
-        pkg = game.resolve(target)  # a typo here would ship a pak that points at nothing
-        idx = data_asset.add_object_import(pkg, pkg.rsplit("/", 1)[1], "NiagaraSystem", "/Script/Niagara")
         part = next(x for x in val["Value"] if x["Name"].startswith("Particle_"))
+        none = target.lower() == "none"  # no trail: an empty reference makes the game fall back to a default one
+        pkg = game.resolve(EMPTY_SYSTEM if none else target)  # a typo here would ship a pak that points at nothing
+        idx = data_asset.add_object_import(pkg, pkg.rsplit("/", 1)[1], "NiagaraSystem", "/Script/Niagara")
         part["Value"] = idx
         part["IsZero"] = False
+        if none:
+            report.append(f"{tag} -> none")
+            continue
         if base.fades and game.has(pkg) and b"UE_StartFade" not in game.raw_bytes(pkg):
             report.append(f"warning: {base.key} fades its trails but {pkg.rsplit('/', 1)[1]} has no UE_StartFade "
                           f"-> it will keep trailing the blade after the attack ({tag})")
