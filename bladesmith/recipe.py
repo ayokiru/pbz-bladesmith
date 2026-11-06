@@ -11,7 +11,8 @@ Recipe (JSON):
     {"base": "ZhanMaBlade", "skin": "Long", "scabbard": true, "trail_color": "outlaw-crimson"},
     {"base": "Horizontal", "skin": "Tang", "blade_color": {"to": "#7a7a7a"}},  # optional "from": hue to replace
     {"base": "SnakeDual", "skin": "Double", "scabbard": true,
-     "effect_meshes": [{"slot": 1, "system": "NS_SnakeDual_PhantomSword_001", "mesh": "SM_FX_DoubleBlade_101"}]}
+     "effect_meshes": [{"slot": 1, "system": "NS_SnakeDual_PhantomSword_001", "mesh": "SM_FX_DoubleBlade_101"}]},
+    {"base": "Double", "add_tags": ["Weapon.Type.Jade"]}   # the dual blade attacks draw trails only for Jade
   ]
 }
 """
@@ -92,6 +93,9 @@ class Builder:
                         self.log.append(f"  slot {i}: scabbard {s.scabbard.rsplit('/', 1)[1]}")
         if w.get("blade_color"):
             self._blade_color(base, w)
+        for tag in w.get("add_tags", []):
+            if ops.add_equip_tag(self._asset(base.package), tag):
+                self.log.append(f"  tag {tag}")
         if w.get("trails"):
             for line in ops.set_trails(self._asset(base.package), w["trails"], base, g):
                 self.log.append("  " + line)

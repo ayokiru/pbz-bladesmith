@@ -41,6 +41,16 @@ def set_blade_material(bp: Asset, mi_package: str) -> None:
     wm["Data"] = [p for p in wm["Data"] if p["Name"] != "OverrideMaterials"] + [override]
 
 
+def add_equip_tag(data_asset: Asset, tag: str) -> bool:
+    """Add a gameplay tag to the weapon's 'Weapon Equip Tags'. False if it is already there."""
+    tags = prop(data_asset.main_data(), "Weapon Equip Tags")["Value"][0]["Value"]
+    if tag in tags:
+        return False
+    data_asset.ensure_name(tag)
+    tags.append(tag)
+    return True
+
+
 def set_scabbard(data_asset: Asset, slot: int, mesh_package: str, socket: str) -> None:
     dd = prop(data_asset.main_data(), "Display Data")["Value"]
     entry = dd[slot]["Value"]

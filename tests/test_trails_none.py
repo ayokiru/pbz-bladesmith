@@ -21,3 +21,16 @@ class NoneTrailTests(unittest.TestCase):
         report = ops.set_trails(data, {"*": "none"}, mock.Mock(fades=True, key="Iron"), game)
         self.assertEqual([t[1]["Value"][0]["Value"] for t in trails], [-9, -9])
         self.assertEqual(report, ["Normal.A -> none", "Kick.L -> none"])
+
+
+class AddEquipTagTests(unittest.TestCase):
+    def test_adds_once_and_registers_the_name(self):
+        from bladesmith.ops import add_equip_tag
+        from bladesmith.asset import Asset
+        data = [{"Name": "Weapon Equip Tags", "Value": [{"Name": "Weapon Equip Tags", "Value": ["Weapon.Type.Global.DualHanded"]}]}]
+        a = Asset({"NameMap": ["Weapon Equip Tags"], "Imports": [], "Exports": [{"ObjectName": "Default__X", "Data": data}]})
+        a.main_data = lambda: data
+        self.assertTrue(add_equip_tag(a, "Weapon.Type.Jade"))
+        self.assertFalse(add_equip_tag(a, "Weapon.Type.Jade"))
+        self.assertEqual(data[0]["Value"][0]["Value"], ["Weapon.Type.Global.DualHanded", "Weapon.Type.Jade"])
+        self.assertIn("Weapon.Type.Jade", a.names)
