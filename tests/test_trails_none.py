@@ -23,14 +23,28 @@ class NoneTrailTests(unittest.TestCase):
         self.assertEqual(report, ["Normal.A -> none", "Kick.L -> none"])
 
 
-class AddEquipTagTests(unittest.TestCase):
-    def test_adds_once_and_registers_the_name(self):
-        from bladesmith.ops import add_equip_tag
+
+class WidenTrailRequirementTests(unittest.TestCase):
+    def _action(self, tags, stream):
+        def item(name, value):
+            return {"Name": name, "Value": value}
+        dic = [item(str(i), [item("TagName", t)]) for i, t in enumerate(tags)]
+        q = [item("TagDictionary", dic), item("QueryTokenStream", [item(str(i), v) for i, v in enumerate(stream)]),
+             item("AutoDescription", "")]
+        return {"ObjectName": "GAA_PBZWeaponTrail_C_0", "Data": [item("ActivationRequirements", [item("TagQuery", q)])]}
+
+    def test_any_query_gets_the_tag_once(self):
         from bladesmith.asset import Asset
-        data = [{"Name": "Weapon Equip Tags", "Value": [{"Name": "Weapon Equip Tags", "Value": ["Weapon.Type.Global.DualHanded"]}]}]
-        a = Asset({"NameMap": ["Weapon Equip Tags"], "Imports": [], "Exports": [{"ObjectName": "Default__X", "Data": data}]})
-        a.main_data = lambda: data
-        self.assertTrue(add_equip_tag(a, "Weapon.Type.Jade"))
-        self.assertFalse(add_equip_tag(a, "Weapon.Type.Jade"))
-        self.assertEqual(data[0]["Value"][0]["Value"], ["Weapon.Type.Global.DualHanded", "Weapon.Type.Jade"])
-        self.assertIn("Weapon.Type.Jade", a.names)
+        e = self._action(["Weapon.Type.Jade"], [0, 1, 1, 1, 0])
+        a = Asset({"NameMap": [], "Imports": [], "Exports": [e]})
+        self.assertEqual(ops.widen_trail_requirement(a, "Weapon.Type.DoubleBlade.Default"), 1)
+        self.assertEqual(ops.widen_trail_requirement(a, "Weapon.Type.DoubleBlade.Default"), 0)
+        q = a.j["Exports"][0]["Data"][0]["Value"][0]["Value"]  # Asset keeps its own copy
+        self.assertEqual([x["Value"] for x in q[1]["Value"]], [0, 1, 1, 2, 0, 1])
+        self.assertEqual(q[0]["Value"][1]["Value"][0]["Value"], "Weapon.Type.DoubleBlade.Default")
+        self.assertIn("Weapon.Type.DoubleBlade.Default", a.names)
+
+    def test_other_queries_are_left_alone(self):
+        from bladesmith.asset import Asset
+        e = self._action(["A.B"], [0, 1, 2, 1, 0])  # ALL(...)
+        self.assertEqual(ops.widen_trail_requirement(Asset({"NameMap": [], "Imports": [], "Exports": [e]}), "C.D"), 0)
