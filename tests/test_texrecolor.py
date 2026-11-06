@@ -59,3 +59,13 @@ class GrayLutTests(unittest.TestCase):
     def test_level_zero_is_black(self):
         from bladesmith.recolor import gray_lut
         self.assertEqual(gray_lut([0.004, 1.0, 0.5, 0.8], 0), [0.0, 0.0, 0.0, 0.8])
+
+
+class AllColorsTests(unittest.TestCase):
+    def test_grey_and_colored_pixels_all_turn_dark_grey_keeping_their_order(self):
+        import numpy as np
+        from bladesmith.texrecolor import recolor_colors
+        rgb = np.array([[0.8, 0.8, 0.8], [0.4, 0.4, 0.4], [0.9, 0.1, 0.1]], np.float32)
+        out = recolor_colors(rgb, (0.2, 0.2, 0.2), all_colors=True, brightness=0.2)
+        self.assertTrue(np.allclose(out[:, 0], out[:, 1]) and np.allclose(out[:, 1], out[:, 2]))  # grey
+        self.assertTrue(np.allclose(out[:, 0], [0.16, 0.08, 0.18], atol=1e-6))  # brightness kept in order

@@ -146,13 +146,17 @@ class Builder:
                 pal = texrecolor.palette(uexp, ubulk)
             except ValueError as e:
                 raise ops.RecipeError(f"{base.key}: blade_color: {e}") from None
-            hue = float(spec["from"]) if "from" in spec else (pal[0]["hue"] if pal else None)
-            if hue is None:
-                raise ops.RecipeError(f"{base.key}: {tex.rsplit('/', 1)[1]} has no colored areas to replace")
-            # the picked color is what the typical shade of the old one becomes; lighter and darker shades follow
-            near = min(pal, key=lambda p: abs((p["hue"] - hue + 180) % 360 - 180), default=None)
-            bright = max(target) / max(max(near["color"]), 1e-3) if near else 1.0
-            kw = {"hue_from": hue, "hue_width": float(spec.get("width", 40)), "brightness": min(bright, 3.0)}
+            if spec.get("all"):
+                # every color: the brightest parts get `to`'s brightness, the rest scale down with them
+                hue, kw = None, {"all_colors": True, "brightness": max(target)}
+            else:
+                hue = float(spec["from"]) if "from" in spec else (pal[0]["hue"] if pal else None)
+                if hue is None:
+                    raise ops.RecipeError(f"{base.key}: {tex.rsplit('/', 1)[1]} has no colored areas to replace")
+                # the picked color is what the typical shade of the old one becomes; lighter and darker shades follow
+                near = min(pal, key=lambda p: abs((p["hue"] - hue + 180) % 360 - 180), default=None)
+                bright = max(target) / max(max(near["color"]), 1e-3) if near else 1.0
+                kw = {"hue_from": hue, "hue_width": float(spec.get("width", 40)), "brightness": min(bright, 3.0)}
             # c<hash>, not a bare hash: an FName ending in _<digits> is stored as base + number, which breaks the copy
             tag = "c" + hashlib.sha1(json.dumps([tex, target, kw], sort_keys=True).encode()).hexdigest()[:8]
             tex_dst = f"{self.fx_folder}/T/{tex.rsplit('/', 1)[1]}_{tag}"
@@ -169,7 +173,8 @@ class Builder:
                 m.export(mi.rsplit("/", 1)[1])["ObjectName"] = mi_dst.rsplit("/", 1)[1]
                 self.edited[mi_dst] = (m, True)
             ops.set_blade_material(self._asset(base.slots[i].bp), mi_dst)
-            self.log.append(f"  slot {i}: {tex.rsplit('/', 1)[1]} hue {hue:g} -> {spec['to']}")
+            what = "all colors" if hue is None else f"hue {hue:g}"
+            self.log.append(f"  slot {i}: {tex.rsplit('/', 1)[1]} {what} -> {spec['to']}")
 
     def stage_path(self, package: str) -> Path:
         if self.game.has(package):

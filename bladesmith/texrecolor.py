@@ -22,13 +22,15 @@ def _pack565(rgb: np.ndarray) -> np.ndarray:
 
 
 def recolor_colors(rgb: np.ndarray, target: tuple[float, float, float], hue_from: float = 0.0, hue_width: float = 40.0,
-                   min_sat: float = 0.25, brightness: float = 1.0) -> np.ndarray:
+                   min_sat: float = 0.25, brightness: float = 1.0, all_colors: bool = False) -> np.ndarray:
     """Colors whose hue is within hue_width degrees of hue_from (and saturated enough) move to `target`'s color,
     keeping their own brightness (times `brightness`); the rest stay. Full strength up to 20 degrees short of the
     edge, then a blend, so crimson and pink shades of the same red all change and outlines don't band."""
     hue, sat, mx = _hues(rgb)
     dist = np.abs((hue - hue_from + 180) % 360 - 180)
     weight = np.clip((hue_width - dist) / 20, 0, 1) * np.clip((sat - min_sat) / 0.15, 0, 1)
+    if all_colors:  # the whole texture, grey steel included: e.g. a black weapon that keeps its detail
+        weight = np.ones_like(weight)
     target = np.asarray(target, np.float32)
     tmax = max(float(target.max()), 1e-6)
     new = mx[..., None] * brightness * (target / tmax)  # the target color at the old color's brightness
