@@ -55,9 +55,10 @@ def _import(a: Asset, obj: str, outer: int, cls: str, cls_pkg: str) -> int:
     return -len(a.imports)
 
 
-def add_effect_component(bp: Asset, system: str, var: str, socket: str) -> None:
-    """Give a weapon blueprint a Niagara component that plays `system` at `socket` of its 'Weapon Mesh', as one
-    more construction script node (the same layout as SnakeDual's phantom sword component)."""
+def add_effect_component(bp: Asset, system: str, var: str, location: tuple[float, float, float]) -> None:
+    """Give a weapon blueprint a Niagara component that plays `system` at `location` from the weapon's root, laid
+    out exactly like SnakeDual's phantom sword: a construction script node under Root, its template, and a class
+    variable (property + case sensitive field name) of the component's name."""
     ex = bp.j["Exports"]
     scs_i = next(k for k, e in enumerate(ex) if str(e["ObjectName"]).startswith("SimpleConstructionScript")) + 1
     node0 = next(e for e in ex if str(e["ObjectName"]).startswith("SCS_Node_") and e["OuterIndex"] == scs_i)
@@ -81,6 +82,11 @@ def add_effect_component(bp: Asset, system: str, var: str, socket: str) -> None:
                 SerializationBeforeSerializationDependencies=[1], CreateBeforeSerializationDependencies=[sys_obj],
                 SerializationBeforeCreateDependencies=[comp_cls, comp_def], CreateBeforeCreateDependencies=[1],
                 Data=[{**obj_prop, "Name": "Asset", "Value": sys_obj}])
+    loc = next((copy.deepcopy(d) for d in template["Data"] if d.get("Name") == "RelativeLocation"), None)
+    if loc is None:
+        raise RecipeError("blueprint has no component with a RelativeLocation to copy")
+    loc["Value"][0]["Value"].update(X=location[0], Y=location[1], Z=location[2])
+    comp["Data"].append(loc)
     ex.append(comp)
     comp_i = len(ex)
 
@@ -93,8 +99,7 @@ def add_effect_component(bp: Asset, system: str, var: str, socket: str) -> None:
     node.update(ObjectName=node_name, CreateBeforeSerializationDependencies=[comp_i],
                 Data=[{**obj_prop, "Name": "ComponentClass", "Value": comp_cls},
                       {**obj_prop, "Name": "ComponentTemplate", "Value": comp_i},
-                      {**name_prop, "Name": "AttachToName", "Value": socket},
-                      {**name_prop, "Name": "ParentComponentOrVariableName", "Value": "Weapon Mesh"},
+                      {**name_prop, "Name": "ParentComponentOrVariableName", "Value": "Root"},
                       {**bool_prop, "Name": "bIsParentComponentNative", "Value": True},
                       guid,
                       {**name_prop, "Name": "InternalVariableName", "Value": var}])
@@ -108,7 +113,15 @@ def add_effect_component(bp: Asset, system: str, var: str, socket: str) -> None:
         item = copy.deepcopy(items[0])
         item["Name"], item["Value"] = str(len(items)), node_i
         items.append(item)
-    for n in (f"{var}_GEN_VARIABLE", var, node_name, "Asset", "AttachToName", socket, "Weapon Mesh",
+    cls = ex[0]
+    var_prop = copy.deepcopy(cls["LoadedProperties"][0])
+    var_prop.update(Name=var, PropertyClass=comp_cls)
+    cls["LoadedProperties"].append(var_prop)
+    fields = prop(cls["Data"], "CaseSensitiveFieldNameMap")["Value"]
+    pair = copy.deepcopy(fields[0])
+    pair[0]["Value"] = pair[1]["Value"] = var
+    fields.append(pair)
+    for n in (f"{var}_GEN_VARIABLE", var, node_name, "Asset", "Root", "RelativeLocation",
               "ObjectProperty", "NameProperty", "BoolProperty"):
         bp.ensure_name(n)
 
