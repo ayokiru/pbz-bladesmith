@@ -43,41 +43,6 @@ def set_blade_material(bp: Asset, mi_package: str) -> None:
     wm["Data"] = [p for p in wm["Data"] if p["Name"] != "OverrideMaterials"] + [override]
 
 
-def widen_trail_requirement(ability: Asset, tag: str) -> int:
-    """In an ability's weapon trail actions whose activation needs ANY(tags), add `tag` to the tags. Returns how
-    many actions changed. Only a plain ANY(...) query is touched."""
-    changed = 0
-    for e in ability.j["Exports"]:
-        if "WeaponTrail" not in str(e.get("ObjectName")):
-            continue
-        for d in e.get("Data") or []:
-            if d.get("Name") != "ActivationRequirements":
-                continue
-            q = prop(d["Value"], "TagQuery")["Value"]
-            tags, stream = prop(q, "TagDictionary")["Value"], prop(q, "QueryTokenStream")["Value"]
-            vals = [x["Value"] for x in stream]
-            # token stream: version, has root, 1 = AnyTagsMatch, tag count, tag indices
-            if len(vals) < 4 or vals[1] != 1 or vals[2] != 1 or len(vals) != 4 + vals[3] or not tags:
-                continue
-            names = [prop(t["Value"], "TagName")["Value"] for t in tags]
-            if tag in names:
-                continue
-            new = copy.deepcopy(tags[-1])
-            new["Name"] = str(len(tags))
-            prop(new["Value"], "TagName")["Value"] = tag
-            tags.append(new)
-            stream[3]["Value"] = vals[3] + 1
-            tok = copy.deepcopy(stream[-1])
-            tok["Name"], tok["Value"] = str(len(stream)), len(tags) - 1
-            stream.append(tok)
-            desc = next((x for x in q if x.get("Name") == "AutoDescription"), None)
-            if desc is not None:
-                desc["Value"] = f" ANY( {', '.join(names + [tag])} )"
-            ability.ensure_name(tag)
-            changed += 1
-    return changed
-
-
 def set_scabbard(data_asset: Asset, slot: int, mesh_package: str, socket: str) -> None:
     dd = prop(data_asset.main_data(), "Display Data")["Value"]
     entry = dd[slot]["Value"]

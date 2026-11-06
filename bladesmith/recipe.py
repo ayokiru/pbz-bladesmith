@@ -11,8 +11,7 @@ Recipe (JSON):
     {"base": "ZhanMaBlade", "skin": "Long", "scabbard": true, "trail_color": "outlaw-crimson"},
     {"base": "Horizontal", "skin": "Tang", "blade_color": {"to": "#7a7a7a"}},  # optional "from": hue to replace
     {"base": "SnakeDual", "skin": "Double", "scabbard": true,
-     "effect_meshes": [{"slot": 1, "system": "NS_SnakeDual_PhantomSword_001", "mesh": "SM_FX_DoubleBlade_101"}]},
-    {"base": "Double", "unlock_trails": true}   # the dual blade attacks draw trails only for Jade
+     "effect_meshes": [{"slot": 1, "system": "NS_SnakeDual_PhantomSword_001", "mesh": "SM_FX_DoubleBlade_101"}]}
   ]
 }
 """
@@ -93,8 +92,6 @@ class Builder:
                         self.log.append(f"  slot {i}: scabbard {s.scabbard.rsplit('/', 1)[1]}")
         if w.get("blade_color"):
             self._blade_color(base, w)
-        if w.get("unlock_trails"):
-            self._unlock_trails(base)
         if w.get("trails"):
             for line in ops.set_trails(self._asset(base.package), w["trails"], base, g):
                 self.log.append("  " + line)
@@ -130,30 +127,6 @@ class Builder:
             self.edited[new] = (copy, False)
             ops.repoint_attached_effect(self._asset(bp), old, new)
             self.log.append(f"  slot {em['slot']}: {old.rsplit('/', 1)[1]} copy with {mesh_to.rsplit('/', 1)[1]} -> {new}")
-
-    def _unlock_trails(self, base) -> None:
-        """Shared attacks can draw their trails only for another weapon type (the dual blade attacks: Jade only).
-        Add this weapon's own type tag to those conditions, in the game's abilities themselves: the other weapons
-        keep their own condition. Giving the weapon the other type's tag instead crashes the game on equip."""
-        g, data = self.game, self._asset(base.package)
-        own = next((t for t in prop(data.main_data(), "Weapon Equip Tags")["Value"][0]["Value"]
-                    if t.startswith("Weapon.Type.") and ".Global." not in t), None)
-        if own is None:
-            raise ops.RecipeError(f"{base.key}: unlock_trails: the weapon has no type tag")
-        abilities = set()
-        for name in ("Equip Abilities", "Change Weapon Abilities"):
-            refs = re.findall(r'"Value": (-\d+)', json.dumps(ops.prop_value(data.main_data(), name, [])))
-            abilities |= {data.package_of(int(i)) for i in refs}
-        total = 0
-        for pkg in sorted(p for p in (g.canon(a) for a in abilities) if p):
-            raw = g.json_of(pkg, mapped=False)
-            if own in raw.get("NameMap", []) or "WeaponTrail" not in json.dumps(raw.get("NameMap", [])):
-                continue
-            n = ops.widen_trail_requirement(self._asset(pkg), own)
-            if n == 0:
-                self.edited.pop(pkg, None)  # nothing to change: keep the game's own file
-            total += n
-        self.log.append(f"  trails unlocked for {own}: {total} trail actions")
 
     def _blade_color(self, base, w: dict) -> None:
         """One color of the skin's albedo texture replaced, in copies of the texture and material that only this
