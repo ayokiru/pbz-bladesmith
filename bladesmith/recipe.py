@@ -172,15 +172,22 @@ class Builder:
                 m.ensure_name(mi_dst.rsplit("/", 1)[1])
                 m.export(mi.rsplit("/", 1)[1])["ObjectName"] = mi_dst.rsplit("/", 1)[1]
                 self.edited[mi_dst] = (m, True)
+            mi_imp = None
             if spec.get("mesh"):
+                raw_mesh = Asset(g.json_of(mesh, mapped=False))
+                # import paths can differ in case from the file (JigSaw / Jigsaw)
+                mi_imp = next((k for k in raw_mesh.find_imports("MaterialInstanceConstant")
+                               if g.canon(raw_mesh.package_of(k)) == mi), None)
+                if mi_imp is None:
+                    self.log.append(f"  slot {i}: the mesh doesn't import {mi.rsplit('/', 1)[1]} itself, override only")
+            if mi_imp is not None:
                 # some blades (bleeding weapons) rebuild their material from the mesh at run time and ignore the
                 # blueprint's override: give them a copy of the mesh that has the new material built in
                 mesh_dst = f"{self.fx_folder}/Mesh/{mesh.rsplit('/', 1)[1]}_{tag}"
                 if mesh_dst not in self.edited:
-                    copy = Asset(g.json_of(mesh, mapped=False))
+                    copy = raw_mesh
                     texrecolor.relocate(copy, mesh, mesh_dst)
-                    idx = next(k for k in copy.find_imports("MaterialInstanceConstant") if copy.package_of(k) == mi)
-                    copy.repoint_import(idx, mi_dst, mi_dst.rsplit("/", 1)[1])
+                    copy.repoint_import(mi_imp, mi_dst, mi_dst.rsplit("/", 1)[1])
                     self.edited[mesh_dst] = (copy, False)
                     bulk = g.legacy_file(mesh).with_suffix(".ubulk")
                     if bulk.exists():
