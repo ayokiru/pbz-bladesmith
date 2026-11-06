@@ -161,8 +161,8 @@ def plan(game: Game, preset: dict, fx_folder: str) -> tuple[dict[str, str], list
     folder = fx_folder.rstrip("/")
     mi_targets, materials = {}, {}
     for name, params in preset.get("materials", {}).items():
-        src = game.resolve(name)
-        dst = f"{folder}/MI/{name}"
+        src = game.resolve(name)  # a name, or the full path when two materials share the name
+        dst = f"{folder}/MI/{src.rsplit('/', 1)[1]}"
         materials[dst], _ = material_copy(game, src, dst, params)
         mi_targets[src] = dst
     remap, effects = {}, []
