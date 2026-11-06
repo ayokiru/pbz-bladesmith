@@ -172,6 +172,22 @@ class Builder:
                 m.ensure_name(mi_dst.rsplit("/", 1)[1])
                 m.export(mi.rsplit("/", 1)[1])["ObjectName"] = mi_dst.rsplit("/", 1)[1]
                 self.edited[mi_dst] = (m, True)
+            if spec.get("mesh"):
+                # some blades (bleeding weapons) rebuild their material from the mesh at run time and ignore the
+                # blueprint's override: give them a copy of the mesh that has the new material built in
+                mesh_dst = f"{self.fx_folder}/Mesh/{mesh.rsplit('/', 1)[1]}_{tag}"
+                if mesh_dst not in self.edited:
+                    copy = Asset(g.json_of(mesh, mapped=False))
+                    texrecolor.relocate(copy, mesh, mesh_dst)
+                    idx = next(k for k in copy.find_imports("MaterialInstanceConstant") if copy.package_of(k) == mi)
+                    copy.repoint_import(idx, mi_dst, mi_dst.rsplit("/", 1)[1])
+                    self.edited[mesh_dst] = (copy, False)
+                    bulk = g.legacy_file(mesh).with_suffix(".ubulk")
+                    if bulk.exists():
+                        self.bulk[mesh_dst] = bulk.read_bytes()
+                bp = self._asset(base.slots[i].bp)
+                bp.repoint_import(ops.prop_value(bp.export("Weapon Mesh")["Data"], "SkeletalMesh"), mesh_dst,
+                                  mesh_dst.rsplit("/", 1)[1])
             ops.set_blade_material(self._asset(base.slots[i].bp), mi_dst)
             what = "all colors" if hue is None else f"hue {hue:g}"
             self.log.append(f"  slot {i}: {tex.rsplit('/', 1)[1]} {what} -> {spec['to']}")

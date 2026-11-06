@@ -212,12 +212,17 @@ def texture_copy(game, tex: str, new_package: str, ubulk: bytes):
     """Relocated copy of a texture package (raw JSON, lossless) and the .ubulk to write next to it."""
     from .asset import Asset
     a = Asset(game.json_of(tex, mapped=False))
-    old_name, new_name = tex.rsplit("/", 1)[1], new_package.rsplit("/", 1)[1]
-    a.rename(tex, new_package, None)
+    relocate(a, tex, new_package)
+    return a, ubulk
+
+
+def relocate(a, package: str, new_package: str) -> None:
+    """Raw asset JSON moved to another package: its path, its main object's name and its folder name."""
+    old_name, new_name = package.rsplit("/", 1)[1], new_package.rsplit("/", 1)[1]
+    a.rename(package, new_package, None)
     a.rename(old_name, new_name, None)
     for e in a.j["Exports"]:
         if e.get("ObjectName") == old_name:
             e["ObjectName"] = new_name
-    if a.j.get("FolderName") == tex:
+    if a.j.get("FolderName") == package:
         a.j["FolderName"] = new_package
-    return a, ubulk
