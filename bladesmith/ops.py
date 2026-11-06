@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import uuid
 
 import fnmatch
 
@@ -41,6 +42,75 @@ def set_blade_material(bp: Asset, mi_package: str) -> None:
     override = {**item, "$type": "UAssetAPI.PropertyTypes.Objects.ArrayPropertyData, UAssetAPI",
                 "ArrayType": "ObjectProperty", "Name": "OverrideMaterials", "Value": [item]}
     wm["Data"] = [p for p in wm["Data"] if p["Name"] != "OverrideMaterials"] + [override]
+
+
+def _import(a: Asset, obj: str, outer: int, cls: str, cls_pkg: str) -> int:
+    for i, x in enumerate(a.imports):
+        if (x["ObjectName"], x["OuterIndex"], x["ClassName"], x["ClassPackage"]) == (obj, outer, cls, cls_pkg):
+            return -(i + 1)
+    for n in (obj, cls, cls_pkg):
+        a.ensure_name(n)
+    a.imports.append({"$type": "UAssetAPI.Import, UAssetAPI", "ObjectName": obj, "OuterIndex": outer,
+                      "ClassPackage": cls_pkg, "ClassName": cls, "PackageName": None, "bImportOptional": False})
+    return -len(a.imports)
+
+
+def add_effect_component(bp: Asset, system: str, var: str, socket: str) -> None:
+    """Give a weapon blueprint a Niagara component that plays `system` at `socket` of its 'Weapon Mesh', as one
+    more construction script node (the same layout as SnakeDual's phantom sword component)."""
+    ex = bp.j["Exports"]
+    scs_i = next(k for k, e in enumerate(ex) if str(e["ObjectName"]).startswith("SimpleConstructionScript")) + 1
+    node0 = next(e for e in ex if str(e["ObjectName"]).startswith("SCS_Node_") and e["OuterIndex"] == scs_i)
+    template = next(e for e in ex if str(e["ObjectName"]).endswith("_GEN_VARIABLE") and e["OuterIndex"] == 1
+                    and e["$type"].endswith("NormalExport, UAssetAPI"))
+    if any(e["ObjectName"] == f"{var}_GEN_VARIABLE" for e in ex):
+        raise RecipeError(f"blueprint already has a component '{var}'")
+    script_pkg = _import(bp, "/Script/Niagara", 0, "Package", "/Script/CoreUObject")
+    comp_cls = _import(bp, "NiagaraComponent", script_pkg, "Class", "/Script/CoreUObject")
+    comp_def = _import(bp, "Default__NiagaraComponent", script_pkg, "NiagaraComponent", "/Script/Niagara")
+    sys_pkg = _import(bp, system, 0, "Package", "/Script/CoreUObject")
+    sys_obj = _import(bp, system.rsplit("/", 1)[1], sys_pkg, "NiagaraSystem", "/Script/Niagara")
+    obj_prop = {"$type": "UAssetAPI.PropertyTypes.Objects.ObjectPropertyData, UAssetAPI", "ArrayIndex": 0,
+                "PropertyGuid": None, "IsZero": False, "PropertyTagFlags": "None", "PropertyTypeName": None,
+                "PropertyTagExtensions": "NoExtension"}
+    name_prop = {**obj_prop, "$type": "UAssetAPI.PropertyTypes.Objects.NamePropertyData, UAssetAPI"}
+    bool_prop = {**obj_prop, "$type": "UAssetAPI.PropertyTypes.Objects.BoolPropertyData, UAssetAPI"}
+
+    comp = copy.deepcopy(template)
+    comp.update(ObjectName=f"{var}_GEN_VARIABLE", ClassIndex=comp_cls, TemplateIndex=comp_def,
+                SerializationBeforeSerializationDependencies=[1], CreateBeforeSerializationDependencies=[sys_obj],
+                SerializationBeforeCreateDependencies=[comp_cls, comp_def], CreateBeforeCreateDependencies=[1],
+                Data=[{**obj_prop, "Name": "Asset", "Value": sys_obj}])
+    ex.append(comp)
+    comp_i = len(ex)
+
+    node = copy.deepcopy(node0)
+    nodes = [e for e in ex if str(e["ObjectName"]).startswith("SCS_Node_")]
+    node_name = f"SCS_Node_{1 + max(int(str(e['ObjectName']).rsplit('_', 1)[1]) for e in nodes)}"
+    guid = prop(node0["Data"], "VariableGUID")
+    guid = copy.deepcopy(guid)
+    guid["Value"][0]["Value"] = "{" + str(uuid.uuid4()).upper() + "}"
+    node.update(ObjectName=node_name, CreateBeforeSerializationDependencies=[comp_i],
+                Data=[{**obj_prop, "Name": "ComponentClass", "Value": comp_cls},
+                      {**obj_prop, "Name": "ComponentTemplate", "Value": comp_i},
+                      {**name_prop, "Name": "AttachToName", "Value": socket},
+                      {**name_prop, "Name": "ParentComponentOrVariableName", "Value": "Weapon Mesh"},
+                      {**bool_prop, "Name": "bIsParentComponentNative", "Value": True},
+                      guid,
+                      {**name_prop, "Name": "InternalVariableName", "Value": var}])
+    ex.append(node)
+    node_i = len(ex)
+
+    scs = ex[scs_i - 1]
+    scs["CreateBeforeSerializationDependencies"] = scs["CreateBeforeSerializationDependencies"] + [node_i]
+    for arr in ("RootNodes", "AllNodes"):
+        items = prop(scs["Data"], arr)["Value"]
+        item = copy.deepcopy(items[0])
+        item["Name"], item["Value"] = str(len(items)), node_i
+        items.append(item)
+    for n in (f"{var}_GEN_VARIABLE", var, node_name, "Asset", "AttachToName", socket, "Weapon Mesh",
+              "ObjectProperty", "NameProperty", "BoolProperty"):
+        bp.ensure_name(n)
 
 
 def set_scabbard(data_asset: Asset, slot: int, mesh_package: str, socket: str) -> None:

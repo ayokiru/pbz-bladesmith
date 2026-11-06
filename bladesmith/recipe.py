@@ -92,6 +92,8 @@ class Builder:
                         self.log.append(f"  slot {i}: scabbard {s.scabbard.rsplit('/', 1)[1]}")
         if w.get("blade_color"):
             self._blade_color(base, w)
+        for fx in w.get("blade_effects", []):
+            self._blade_effect(base, w, fx)
         if w.get("trails"):
             for line in ops.set_trails(self._asset(base.package), w["trails"], base, g):
                 self.log.append("  " + line)
@@ -127,6 +129,20 @@ class Builder:
             self.edited[new] = (copy, False)
             ops.repoint_attached_effect(self._asset(bp), old, new)
             self.log.append(f"  slot {em['slot']}: {old.rsplit('/', 1)[1]} copy with {mesh_to.rsplit('/', 1)[1]} -> {new}")
+
+    def _blade_effect(self, base, w: dict, fx: dict) -> None:
+        """A looping effect added to every blade of the weapon, at a socket of its mesh (default: the tip),
+        optionally recolored by a preset (a copy in fx_folder)."""
+        g = self.game
+        system = g.resolve(fx["system"])
+        if fx.get("preset"):
+            remap, effects, materials = recolor.plan(g, recolor.load_preset(fx["preset"]), self.fx_folder)
+            self._add_copies(effects, materials)
+            system = remap.get(system, system)
+        for i in w.get("slots", list(range(len(base.slots)))):
+            ops.add_effect_component(self._asset(base.slots[i].bp), system, fx.get("name", "Blade Effect"),
+                                     fx.get("socket", "TrailStart"))
+        self.log.append(f"  blade effect {system.rsplit('/', 1)[1]} at {fx.get('socket', 'TrailStart')}")
 
     def _blade_color(self, base, w: dict) -> None:
         """One color of the skin's albedo texture replaced, in copies of the texture and material that only this
