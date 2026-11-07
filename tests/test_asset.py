@@ -52,6 +52,12 @@ class TintTests(unittest.TestCase):
         self.assertAlmostEqual(max(r, g, b), 4.0, places=5)                  # brightness kept
         self.assertAlmostEqual(colorsys.rgb_to_hsv(r / 4, g / 4, b / 4)[0] * 360, 212, delta=1)
 
+    def test_mono_turns_colors_grey_by_brightness(self):
+        from bladesmith.recolor import tint_rgb
+        r, g, b = tint_rgb(1.0, 0.0, 0.0, None)                              # pure red -> dark grey
+        self.assertTrue(r == g == b and abs(r - 0.2126) < 1e-6)
+        self.assertEqual(tint_rgb(0.9, 0.9, 0.9, None), (0.9, 0.9, 0.9))     # white stays white
+
 
 class SafetyTests(unittest.TestCase):
     """The three places that silently damage data when they break."""

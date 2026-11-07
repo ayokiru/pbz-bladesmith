@@ -179,18 +179,22 @@ def plan(game: Game, preset: dict, fx_folder: str) -> tuple[dict[str, str], list
 # hue of every saturated color in the effect's color curves and in its material colors to one target hue,
 # keeping brightness and saturation, and leaves white, grey and black alone. Colors baked into script
 # constants are not touched, so some effects keep a part of their original color.
-TINTS = {"crimson": 355, "ember": 18, "gold": 44, "jade": 140, "azure": 212, "violet": 278}
+TINTS = {"crimson": 355, "ember": 18, "gold": 44, "jade": 140, "azure": 212, "violet": 278, "mono": None}
 COLOR_PARAM = re.compile(r"colou?r|tint|emiss|glow|fresnel|edge|rim|weight", re.I)
 
 
-def tint_rgb(r: float, g: float, b: float, hue: float) -> tuple[float, float, float]:
-    """Same brightness and saturation, new hue; nearly grey colors stay as they are."""
+def tint_rgb(r: float, g: float, b: float, hue: float | None) -> tuple[float, float, float]:
+    """Same brightness and saturation, new hue; nearly grey colors stay as they are.
+    hue None (mono): grey at the color's perceived brightness, so a strong red turns dark and white stays white."""
     top = max(r, g, b)
     if top <= 0:
         return r, g, b
     h, s, v = colorsys.rgb_to_hsv(r / top, g / top, b / top)   # HDR values: normalise, then scale back
     if s < 0.12:
         return r, g, b
+    if hue is None:
+        y = 0.2126 * r + 0.7152 * g + 0.0722 * b
+        return y, y, y
     nr, ng, nb = colorsys.hsv_to_rgb(hue / 360, s, v)
     return nr * top, ng * top, nb * top
 
